@@ -1,0 +1,139 @@
+C251 COMPILER V5.60.0,  image                                                              29/09/26  17:35:49  PAGE 1   
+
+
+C251 COMPILER V5.60.0, COMPILATION OF MODULE image
+OBJECT MODULE PLACED IN .\out_file\image.obj
+COMPILER INVOKED BY: D:\keil c251\C251\BIN\C251.EXE ..\own_f\image.c LARGE FLOAT64 ROM(HUGE) WARNINGLEVEL(3) OPTIMIZE(0,
+                    -SIZE) BROWSE INCDIR(..\user;..\own_f;..\mdk;..\code;..\..\libraries\doc;..\..\libraries\zf_common;..\..\libraries\zf_com
+                    -ponents;..\..\libraries\zf_device;..\..\libraries\zf_driver) DEBUG PRINT(.\out_file\image.lst) TABS(2) OBJECT(.\out_file
+                    -\image.obj) 
+
+stmt  level    source
+
+    1          #include "image.h"
+    2          
+    3          /*图像缓冲数组*/
+    4          static uint8 xdata display_buffer[MT9V03X_H][MT9V03X_W];
+    5          
+    6          static uint8 image_threshold = 0;
+    7          static uint16 frame_cnt = 0, image_fps = 0;
+    8          
+    9          static uint8 adapt_threshold(uint8 xdata *image, uint16 col, uint16 row);
+   10          
+   11          
+   12          uint8 image_update(void)
+   13          {
+   14   1          if(!mt9v03x_finish_flag) return 0;          /* 没有新帧就直接返回，main 不用管标志位 */
+   15   1      
+   16   1          image_threshold = adapt_threshold((uint8 xdata *)mt9v03x_image, MT9V03X_W, MT9V03X_H);
+   17   1          memcpy(display_buffer, mt9v03x_image, sizeof(display_buffer));
+   18   1          mt9v03x_finish_flag = 0;                    /* 处理完才放行下一帧 */
+   19   1      
+   20   1          return 1;
+   21   1      }
+   22          
+   23          
+   24          void image_show(void)
+   25          {
+   26   1      #if IMG_SHOW_ENABLE
+   27   1          ips200_show_gray_image(0, 0, display_buffer[0],
+   28   1                                 MT9V03X_W, MT9V03X_H,
+   29   1                                 CAMERA_DIS_W, CAMERA_DIS_H,
+   30   1                                 0);
+   31   1      #endif
+   32   1      }
+   33          
+   34          
+   35          uint8 image_get_threshold(void) { return image_threshold; }
+   36          
+   37          
+   38          void image_draw_point(uint16 row, uint16 col, uint8 gray)
+   39          {
+   40   1          if(row < MT9V03X_H && col < MT9V03X_W) display_buffer[row][col] = gray;
+   41   1      }
+   42          
+   43          
+   44          static uint8 adapt_threshold(uint8 xdata *image, uint16 col, uint16 row)   
+   45          {
+   46   1        #define GrayScale 256
+   47   1          uint16 width = col;
+   48   1          uint16 height = row;
+   49   1          int pixelCount[GrayScale];
+   50   1          float pixelPro[GrayScale];
+   51   1          uint16 i, j;
+   52   1        int pixelSum = 0;
+   53   1          uint8 threshold = 0;
+   54   1        uint32 gray_sum=0;
+   55   1        
+   56   1        float w0, w1, u0tmp, u1tmp, u0, u1, u, deltaTmp, deltaMax = 0;
+C251 COMPILER V5.60.0,  image                                                              29/09/26  17:35:49  PAGE 2   
+
+   57   1        
+   58   1        pixelSum = (width) * (height-60)/9;
+   59   1        
+   60   1          for (i = 0; i < GrayScale; i++)
+   61   1          {
+   62   2              pixelCount[i] = 0;
+   63   2              pixelPro[i] = 0;
+   64   2          }
+   65   1          
+   66   1          for (i = 10; i < height-50 ; i+=3)
+   67   1          {
+   68   2              for (j = 0; j < width; j+=3)
+   69   2              {
+   70   3          pixelCount[(int)image[i * width + j]]++;  
+   71   3          gray_sum+=(int)image[i * width + j];       
+   72   3          }
+   73   2          }
+   74   1      
+   75   1          for (i = 0; i < GrayScale; i++)
+   76   1          {
+   77   2              pixelPro[i] = (float)pixelCount[i] / pixelSum;
+   78   2          }
+   79   1          w0 = w1 = u0tmp = u1tmp = u0 = u1 = u = deltaTmp = 0;
+   80   1          for (j = 0; j < GrayScale; j++)
+   81   1          {
+   82   2            w0 += pixelPro[j];  
+   83   2            u0tmp += j * pixelPro[j]; 
+   84   2            w1=1-w0;
+   85   2            u1tmp=gray_sum/pixelSum-u0tmp;
+   86   2            u0 = u0tmp / w0;              
+   87   2            u1 = u1tmp / w1;              
+   88   2            u = u0tmp + u1tmp;           
+   89   2            deltaTmp = w0 * pow((u0 - u), 2) + w1 * pow((u1 - u), 2);
+   90   2            if (deltaTmp > deltaMax)
+   91   2            {
+   92   3                deltaMax = deltaTmp;
+   93   3                threshold = (uint8)j;
+   94   3            }
+   95   2            if (deltaTmp < deltaMax)
+   96   2            {
+   97   3            break;
+   98   3            }
+   99   2          }
+  100   1          return threshold;
+  101   1      }
+
+
+Module Information          Static   Overlayable
+------------------------------------------------
+  code size            =    ------     ------
+  ecode size           =      1471     ------
+  data size            =    ------     ------
+  idata size           =    ------     ------
+  pdata size           =    ------     ------
+  xdata size           =     24163     ------
+  xdata-const size     =    ------     ------
+  edata size           =    ------     ------
+  bit size             =    ------     ------
+  ebit size            =    ------     ------
+  bitaddressable size  =    ------     ------
+  ebitaddressable size =    ------     ------
+  far data size        =    ------     ------
+  huge data size       =    ------     ------
+  const size           =    ------     ------
+  hconst size          =        20     ------
+End of Module Information.
+
+
+C251 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,550 @@
+C251 COMPILER V5.60.0,  isr                                                                29/09/26  17:14:54  PAGE 1   
+
+
+C251 COMPILER V5.60.0, COMPILATION OF MODULE isr
+OBJECT MODULE PLACED IN .\out_file\isr.obj
+COMPILER INVOKED BY: D:\keil c251\C251\BIN\C251.EXE ..\user\isr.c LARGE FLOAT64 ROM(HUGE) WARNINGLEVEL(3) OPTIMIZE(0,SIZ
+                    -E) BROWSE INCDIR(..\user;..\own_f;..\mdk;..\code;..\..\libraries\doc;..\..\libraries\zf_common;..\..\libraries\zf_compon
+                    -ents;..\..\libraries\zf_device;..\..\libraries\zf_driver) DEBUG PRINT(.\out_file\isr.lst) TABS(2) OBJECT(.\out_file\isr.
+                    -obj) 
+
+stmt  level    source
+
+    1          /********************************************************************************************************
+             -*************
+    2           * STC32G144K Opensourec Library 即（STC32G144K 开源库）是一个基于官方 SDK 接口的第三方开源库
+    3           * Copyright (c) 2025 SEEKFREE 逐飞科技
+    4           *
+    5           * 本文件是STC32G144K开源库的一部分
+    6           *
+    7           * STC32G144K 开源库 是免费软件
+    8           * 您可以根据自由软件基金会发布的 GPL（GNU General Public License，即 GNU通用公共许可证）的条款
+    9           * 即 GPL 的第3版（即 GPL3.0）或（您选择的）任何后来的版本，重新发布和/或修改它
+   10           *
+   11           * 本开源库的发布是希望它能发挥作用，但并未对其作任何的保证
+   12           * 甚至没有隐含的适销性或适合特定用途的保证
+   13           * 更多细节请参见 GPL
+   14           *
+   15           * 您应该在收到本开源库的同时收到一份 GPL 的副本
+   16           * 如果没有，请参阅<https://www.gnu.org/licenses/>
+   17           *
+   18           * 额外注明：
+   19           * 本开源库使用 GPL3.0 开源许可证协议 以上许可申明为译文版本
+   20           * 许可申明英文版在 libraries/doc 文件夹下的 GPL3_permission_statement.txt 文件中
+   21           * 许可证副本在 libraries 文件夹下 即该文件夹下的 LICENSE 文件
+   22           * 欢迎各位使用并传播本程序 但修改内容时必须保留逐飞科技的版权声明（即本声明）
+   23           *
+   24           * 文件名称
+   25           * 公司名称          成都逐飞科技有限公司
+   26           * 版本信息          查看 libraries/doc 文件夹内 version 文件 版本说明
+   27           * 开发环境          MDK FOR C251
+   28           * 适用平台          STC32G144K
+   29           * 店铺链接          https://seekfree.taobao.com/
+   30           *
+   31           * 修改记录
+   32           * 日期              作者           备注
+   33           * 2025-11-20         大W            first version
+   34           ********************************************************************************************************
+             -************/
+   35          
+   36          #include "zf_common_headfile.h"
+   37          //// 在 #include "zf_common_headfile.h" 之后添加
+   38          //volatile uint32 vsync_count = 0;
+   39          //volatile uint32 dma_count   = 0;
+   40          
+   41          void INT0_IRQHandler() interrupt INT0_VECTOR
+   42          {
+   43   1        if (int_irq_handlers[0] != NULL)
+   44   1          {
+   45   2              int_irq_handlers[0]();
+   46   2          }
+   47   1      }
+   48          
+   49          //void INT1_IRQHandler(void) interrupt INT1_VECTOR  //外部中断1，默认留给摄像头
+   50          
+   51          void INT2_IRQHandler(void) interrupt INT2_VECTOR
+   52          {
+   53   1        if (int_irq_handlers[2] != NULL)
+   54   1          {
+C251 COMPILER V5.60.0,  isr                                                                29/09/26  17:14:54  PAGE 2   
+
+   55   2          int_irq_handlers[2]();
+   56   2          }
+   57   1      }
+   58          void INT3_IRQHandler(void) interrupt INT3_VECTOR
+   59          {
+   60   1        if (int_irq_handlers[3] != NULL)
+   61   1          {
+   62   2          int_irq_handlers[3]();
+   63   2          }
+   64   1      }
+   65          
+   66          void INT4_IRQHandler(void) interrupt INT4_VECTOR
+   67          {
+   68   1        if (int_irq_handlers[4] != NULL)
+   69   1          {
+   70   2          int_irq_handlers[4]();
+   71   2          }
+   72   1      }
+   73          
+   74          void DMA_UART1_IRQHandler(void) interrupt DMA_UR1R_VECTOR
+   75          {
+   76   1          static vuint8 dwon_count = 0;
+   77   1      
+   78   1          if (DMA_UR1R_STA & 0x01) // 接收完成
+   79   1          {
+   80   2              DMA_UR1R_STA &= ~0x01;      // 清标志位
+   81   2              uart_rx_start_buff(UART_1); // 设置下一次接收，务必保留
+   82   2      
+   83   2              // 程序自动下载
+   84   2              if (uart_rx_buff[UART_1][0] == 0x7F)
+   85   2              {
+   86   3                  if (dwon_count++ > 20)
+   87   3                  {
+   88   4                      IAP_CONTR = 0x60;
+   89   4                  }
+   90   3              }
+   91   2              else
+   92   2              {
+   93   3                  dwon_count = 0;
+   94   3              }
+   95   2      
+   96   2              if (uart_rx_handlers[UART_1] != NULL)
+   97   2              {
+   98   3                  uart_rx_handlers[UART_1](uart_rx_buff[UART_1][0]);
+   99   3              }
+  100   2          }
+  101   1      
+  102   1          if (DMA_UR1R_STA & 0x02) // 数据丢弃
+  103   1          {
+  104   2              DMA_UR1R_STA &= ~0x02;      // 清标志位
+  105   2              uart_rx_start_buff(UART_1); // 设置下一次接收，务必保留
+  106   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  107   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  108   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  109   2          }
+  110   1      }
+  111          
+  112          void DMA_UART2_IRQHandler(void) interrupt DMA_UR2R_VECTOR
+  113          {
+  114   1          if (DMA_UR2R_STA & 0x01) // 接收完成
+  115   1          {
+  116   2              DMA_UR2R_STA &= ~0x01;      // 清标志位
+  117   2              uart_rx_start_buff(UART_2); // 设置下一次接收，务必保留
+  118   2      
+  119   2              if (uart_rx_handlers[UART_2] != NULL)
+  120   2              {
+C251 COMPILER V5.60.0,  isr                                                                29/09/26  17:14:54  PAGE 3   
+
+  121   3                  uart_rx_handlers[UART_2](uart_rx_buff[UART_2][0]);
+  122   3              }
+  123   2          }
+  124   1      
+  125   1          if (DMA_UR2R_STA & 0x02) // 数据丢弃
+  126   1          {
+  127   2              DMA_UR2R_STA &= ~0x02;      // 清标志位
+  128   2              uart_rx_start_buff(UART_2); // 设置下一次接收，务必保留
+  129   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  130   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  131   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  132   2          }
+  133   1      }
+  134          
+  135          void DMA_UART3_IRQHandler(void) interrupt DMA_UR3R_VECTOR
+  136          {
+  137   1          if (DMA_UR3R_STA & 0x01) // 接收完成
+  138   1          {
+  139   2              DMA_UR3R_STA &= ~0x01;      // 清标志位
+  140   2              uart_rx_start_buff(UART_3); // 设置下一次接收，务必保留
+  141   2      
+  142   2              if (uart_rx_handlers[UART_3] != NULL)
+  143   2              {
+  144   3                  uart_rx_handlers[UART_3](uart_rx_buff[UART_3][0]);
+  145   3              }
+  146   2          }
+  147   1      
+  148   1          if (DMA_UR3R_STA & 0x02) // 数据丢弃
+  149   1          {
+  150   2              DMA_UR3R_STA &= ~0x02;      // 清标志位
+  151   2              uart_rx_start_buff(UART_3); // 设置下一次接收，务必保留
+  152   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  153   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  154   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  155   2          }
+  156   1      }
+  157          
+  158          void DMA_UART4_IRQHandler(void) interrupt DMA_UR4R_VECTOR
+  159          {
+  160   1          if (DMA_UR4R_STA & 0x01) // 接收完成
+  161   1          {
+  162   2              DMA_UR4R_STA &= ~0x01;      // 清标志位
+  163   2              uart_rx_start_buff(UART_4); // 设置下一次接收，务必保留
+  164   2      
+  165   2              if (uart_rx_handlers[UART_4] != NULL)
+  166   2              {
+  167   3                  uart_rx_handlers[UART_4](uart_rx_buff[UART_4][0]);
+  168   3              }
+  169   2          }
+  170   1      
+  171   1          if (DMA_UR4R_STA & 0x02) // 数据丢弃
+  172   1          {
+  173   2              DMA_UR4R_STA &= ~0x02;      // 清标志位
+  174   2              uart_rx_start_buff(UART_4); // 设置下一次接收，务必保留
+  175   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  176   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  177   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  178   2          }
+  179   1      }
+  180          
+  181          
+  182          void DMA_UART5_IRQHandler(void) interrupt DMA_UR5R_VECTOR
+  183          {
+  184   1          if (DMA_UR5R_STA & 0x01) // 接收完成
+  185   1          {
+  186   2              DMA_UR5R_STA &= ~0x01;      // 清标志位
+C251 COMPILER V5.60.0,  isr                                                                29/09/26  17:14:54  PAGE 4   
+
+  187   2              uart_rx_start_buff(UART_5); // 设置下一次接收，务必保留
+  188   2      
+  189   2              if (uart_rx_handlers[UART_5] != NULL)
+  190   2              {
+  191   3                  uart_rx_handlers[UART_5](uart_rx_buff[UART_5][0]);
+  192   3              }
+  193   2          }
+  194   1      
+  195   1          if (DMA_UR5R_STA & 0x02) // 数据丢弃
+  196   1          {
+  197   2              DMA_UR5R_STA &= ~0x02;      // 清标志位
+  198   2              uart_rx_start_buff(UART_5); // 设置下一次接收，务必保留
+  199   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  200   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  201   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  202   2          }
+  203   1      }
+  204          
+  205          void DMA_UART6_IRQHandler(void) interrupt DMA_UR6R_VECTOR
+  206          {
+  207   1          if (DMA_UR6R_STA & 0x01) // 接收完成
+  208   1          {
+  209   2              DMA_UR6R_STA &= ~0x01;      // 清标志位
+  210   2              uart_rx_start_buff(UART_6); // 设置下一次接收，务必保留
+  211   2      
+  212   2              if (uart_rx_handlers[UART_6] != NULL)
+  213   2              {
+  214   3                  uart_rx_handlers[UART_6](uart_rx_buff[UART_6][0]);
+  215   3              }
+  216   2          }
+  217   1      
+  218   1          if (DMA_UR6R_STA & 0x02) // 数据丢弃
+  219   1          {
+  220   2              DMA_UR6R_STA &= ~0x02;      // 清标志位
+  221   2              uart_rx_start_buff(UART_6); // 设置下一次接收，务必保留
+  222   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  223   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  224   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  225   2          }
+  226   1      }
+  227          
+  228          void DMA_UART7_IRQHandler(void) interrupt DMA_UR7R_VECTOR
+  229          {
+  230   1          if (DMA_UR7R_STA & 0x01) // 接收完成
+  231   1          {
+  232   2              DMA_UR7R_STA &= ~0x01;      // 清标志位
+  233   2              uart_rx_start_buff(UART_7); // 设置下一次接收，务必保留
+  234   2      
+  235   2              if (uart_rx_handlers[UART_7] != NULL)
+  236   2              {
+  237   3                  uart_rx_handlers[UART_7](uart_rx_buff[UART_7][0]);
+  238   3              }
+  239   2          }
+  240   1      
+  241   1          if (DMA_UR7R_STA & 0x02) // 数据丢弃
+  242   1          {
+  243   2              DMA_UR7R_STA &= ~0x02;      // 清标志位
+  244   2              uart_rx_start_buff(UART_7); // 设置下一次接收，务必保留
+  245   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  246   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  247   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  248   2          }
+  249   1      }
+  250          
+  251          void DMA_UART8_IRQHandler(void) interrupt DMA_UR8R_VECTOR
+  252          {
+C251 COMPILER V5.60.0,  isr                                                                29/09/26  17:14:54  PAGE 5   
+
+  253   1          if (DMA_UR8R_STA & 0x01) // 接收完成
+  254   1          {
+  255   2              DMA_UR8R_STA &= ~0x01;      // 清标志位
+  256   2              uart_rx_start_buff(UART_8); // 设置下一次接收，务必保留
+  257   2      
+  258   2              if (uart_rx_handlers[UART_8] != NULL)
+  259   2              {
+  260   3                  uart_rx_handlers[UART_8](uart_rx_buff[UART_8][0]);
+  261   3              }
+  262   2          }
+  263   1      
+  264   1          if (DMA_UR8R_STA & 0x02) // 数据丢弃
+  265   1          {
+  266   2              DMA_UR8R_STA &= ~0x02;      // 清标志位
+  267   2              uart_rx_start_buff(UART_8); // 设置下一次接收，务必保留
+  268   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  269   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  270   2              // 如果进入了这个中断，则代表UART的数据在没有取走之前被覆盖!
+  271   2          }
+  272   1      }
+  273          
+  274          
+  275          void TM0_IRQHandler() interrupt TMR0_VECTOR
+  276          {
+  277   1          TIM0_CLEAR_FLAG;
+  278   1          if (tim_irq_handlers[TIM_0] != NULL)
+  279   1          {
+  280   2              tim_irq_handlers[TIM_0]();
+  281   2          }
+  282   1      }
+  283          
+  284          void TM1_IRQHandler() interrupt TMR1_VECTOR
+  285          {
+  286   1          TIM1_CLEAR_FLAG;
+  287   1          if (tim_irq_handlers[TIM_1] != NULL)
+  288   1          {
+  289   2              tim_irq_handlers[TIM_1]();
+  290   2          }
+  291   1      }
+  292          
+  293          void TM2_IRQHandler() interrupt TMR2_VECTOR
+  294          {
+  295   1          TIM2_CLEAR_FLAG;
+  296   1          if (tim_irq_handlers[TIM_2] != NULL)
+  297   1          {
+  298   2              tim_irq_handlers[TIM_2]();
+  299   2          }
+  300   1      }
+  301          
+  302          void TM3_IRQHandler() interrupt TMR3_VECTOR
+  303          {
+  304   1          TIM3_CLEAR_FLAG;
+  305   1          if (tim_irq_handlers[TIM_3] != NULL)
+  306   1          {
+  307   2              tim_irq_handlers[TIM_3]();
+  308   2          }
+  309   1      }
+  310          
+  311          void TM4_IRQHandler() interrupt TMR4_VECTOR
+  312          {
+  313   1          TIM4_CLEAR_FLAG;
+  314   1          if (tim_irq_handlers[TIM_4] != NULL)
+  315   1          {
+  316   2              tim_irq_handlers[TIM_4]();
+  317   2          }
+  318   1      }
+C251 COMPILER V5.60.0,  isr                                                                29/09/26  17:14:54  PAGE 6   
+
+  319          
+  320          void TM5_TM6_IRQHandler() interrupt TMR5_TMR6_VECTOR
+  321          {
+  322   1          if(TIM5_GET_FLAG)
+  323   1          {
+  324   2              TIM5_CLEAR_FLAG;
+  325   2              if (tim_irq_handlers[TIM_5] != NULL)
+  326   2              {
+  327   3                  tim_irq_handlers[TIM_5]();
+  328   3              }
+  329   2          }
+  330   1          
+  331   1          if(TIM6_GET_FLAG)
+  332   1          {
+  333   2              TIM6_CLEAR_FLAG;
+  334   2              if (tim_irq_handlers[TIM_6] != NULL)
+  335   2              {
+  336   3                  tim_irq_handlers[TIM_6]();
+  337   3              }
+  338   2          }
+  339   1      }
+  340          
+  341          void TM7_IRQHandler() interrupt TMR7_TMR8_VECTOR
+  342          {
+  343   1          if(TIM7_GET_FLAG)
+  344   1          {
+  345   2              TIM7_CLEAR_FLAG;
+  346   2              if (tim_irq_handlers[TIM_7] != NULL)
+  347   2              {
+  348   3                  tim_irq_handlers[TIM_7]();
+  349   3              }
+  350   2          }
+  351   1          
+  352   1          if(TIM8_GET_FLAG)
+  353   1          {
+  354   2              TIM8_CLEAR_FLAG;
+  355   2              if (tim_irq_handlers[TIM_8] != NULL)
+  356   2              {
+  357   3                  tim_irq_handlers[TIM_8]();
+  358   3              }
+  359   2          }
+  360   1      }
+  361          
+  362          
+  363          void TM9_TM10_IRQHandler() interrupt TMR9_TMR10_VECTOR
+  364          {
+  365   1          if(TIM9_GET_FLAG)
+  366   1          {
+  367   2              TIM9_CLEAR_FLAG;
+  368   2              if (tim_irq_handlers[TIM_9] != NULL)
+  369   2              {
+  370   3                  tim_irq_handlers[TIM_9]();
+  371   3              }
+  372   2          }
+  373   1          
+  374   1          if(TIM10_GET_FLAG)
+  375   1          {
+  376   2              TIM10_CLEAR_FLAG;
+  377   2              if (tim_irq_handlers[TIM_10] != NULL)
+  378   2              {
+  379   3                  tim_irq_handlers[TIM_10]();
+  380   3              }
+  381   2          }
+  382   1      }
+  383          
+  384          
+C251 COMPILER V5.60.0,  isr                                                                29/09/26  17:14:54  PAGE 7   
+
+  385          
+  386          void TM11_IRQHandler() interrupt TMR11_VECTOR
+  387          {
+  388   1          TIM11_CLEAR_FLAG;
+  389   1      
+  390   1          if (tim_irq_handlers[TIM_11] != NULL)
+  391   1          {
+  392   2              tim_irq_handlers[TIM_11]();
+  393   2          }
+  394   1      }
+  395          
+  396          void TM17_TM18_IRQHandler() interrupt TMR17_TMR18_VECTOR
+  397          {
+  398   1          if(TIM17_GET_FLAG)
+  399   1          {
+  400   2              TIM17_CLEAR_FLAG;
+  401   2              if (tim_irq_handlers[TIM_17] != NULL)
+  402   2              {
+  403   3                  tim_irq_handlers[TIM_17]();
+  404   3              }
+  405   2          }
+  406   1          
+  407   1          if(TIM18_GET_FLAG)
+  408   1          {
+  409   2              TIM18_CLEAR_FLAG;
+  410   2              if (tim_irq_handlers[TIM_18] != NULL)
+  411   2              {
+  412   3                  tim_irq_handlers[TIM_18]();
+  413   3              }
+  414   2          }
+  415   1      }
+  416          
+  417          void INT1_IRQHandler() interrupt INT1_VECTOR
+  418          {
+  419   1      
+  420   1      //    if(mt9v03x_finish_flag == 1)
+  421   1      //    {
+  422   1      //        return;
+  423   1      //    }
+  424   1          mt9v03x_vsync_handler();
+  425   1      }
+  426          
+  427          
+  428          void DMA_LCM_IRQHandler() interrupt DMA_LCM_VECTOR
+  429          {   
+  430   1      
+  431   1          mt9v03x_dma_handler();
+  432   1      }
+  433          
+  434          
+  435          
+  436          
+  437          
+  438          //#define     INT0_VECTOR             0       //0003H
+  439          //#define     TMR0_VECTOR             1       //000BH
+  440          //#define     INT1_VECTOR             2       //0013H
+  441          //#define     TMR1_VECTOR             3       //001BH
+  442          //#define     UART1_VECTOR            4       //0023H
+  443          //#define     ADC_VECTOR              5       //002BH
+  444          //#define     LVD_VECTOR              6       //0033H
+  445          ////#define   PCA_VECTOR              7       //003BH
+  446          //#define     UART2_VECTOR            8       //0043H
+  447          //#define     SPI_VECTOR              9       //004BH
+  448          //#define     INT2_VECTOR             10      //0053H
+  449          //#define     INT3_VECTOR             11      //005BH
+  450          //#define     TMR2_VECTOR             12      //0063H
+C251 COMPILER V5.60.0,  isr                                                                29/09/26  17:14:54  PAGE 8   
+
+  451          //#define     USER_VECTOR             13      //006BH
+  452          //#define     BRK_VECTOR              14      //0073H
+  453          //#define     ICEP_VECTOR             15      //007BH
+  454          //#define     INT4_VECTOR             16      //0083H
+  455          //#define     UART3_VECTOR            17      //008BH
+  456          //#define     UART4_VECTOR            18      //0093H
+  457          //#define     TMR3_VECTOR             19      //009BH
+  458          //#define     TMR4_VECTOR             20      //00A3H
+  459          //#define     CMP_VECTOR              21      //00ABH
+  460          ////#define   PWM_VECTOR              22      //00B3H
+  461          ////#define   PWMFD_VECTOR            23      //00BBH
+  462          //#define     I2C_VECTOR              24      //00C3H
+  463          //#define     USB_VECTOR              25      //00CBH
+  464          //#define     PWMA_VECTOR             26      //00D3H
+  465          //#define     PWMB_VECTOR             27      //00DBH
+  466          //#define     CAN1_VECTOR             28      //00E3H
+  467          //#define     CAN2_VECTOR             29      //00EBH
+  468          //#define     LIN_VECTOR              30      //00F3H
+  469          
+  470          //#define     RTC_VECTOR              36      //0123H
+  471          //#define     P0INT_VECTOR            37      //012BH
+  472          //#define     P1INT_VECTOR            38      //0133H
+  473          //#define     P2INT_VECTOR            39      //013BH
+  474          //#define     P3INT_VECTOR            40      //0143H
+  475          //#define     P4INT_VECTOR            41      //014BH
+  476          //#define     P5INT_VECTOR            42      //0153H
+  477          //#define     P6INT_VECTOR            43      //015BH
+  478          //#define     P7INT_VECTOR            44      //0163H
+  479          //#define     DMA_M2M_VECTOR          47      //017BH
+  480          //#define     DMA_ADC_VECTOR          48      //0183H
+  481          //#define     DMA_SPI_VECTOR          49      //018BH
+  482          //#define     DMA_UR1T_VECTOR         50      //0193H
+  483          //#define     DMA_UR1R_VECTOR         51      //019BH
+  484          //#define     DMA_UR2T_VECTOR         52      //01A3H
+  485          //#define     DMA_UR2R_VECTOR         53      //01ABH
+  486          //#define     DMA_UR3T_VECTOR         54      //01B3H
+  487          //#define     DMA_UR3R_VECTOR         55      //01BBH
+  488          //#define     DMA_UR4T_VECTOR         56      //01C3H
+  489          //#define     DMA_UR4R_VECTOR         57      //01CBH
+  490          //#define     DMA_LCM_VECTOR          58      //01D3H
+  491          //#define     LCM_VECTOR              59      //01DBH
+  492          //#define     DMA_I2CT_VECTOR         60      //01E3H
+  493          //#define     DMA_I2CR_VECTOR         61      //01EBH
+  494          //#define     I2S_VECTOR              62      //01F3H
+  495          //#define     DMA_I2ST_VECTOR         63      //01FBH
+  496          //#define     DMA_I2SR_VECTOR         64      //0203H
+
+
+Module Information          Static   Overlayable
+------------------------------------------------
+  code size            =        96     ------
+  ecode size           =      2750     ------
+  data size            =    ------     ------
+  idata size           =    ------     ------
+  pdata size           =    ------     ------
+  xdata size           =         1     ------
+  xdata-const size     =    ------     ------
+  edata size           =    ------     ------
+  bit size             =    ------     ------
+  ebit size            =    ------     ------
+  bitaddressable size  =    ------     ------
+  ebitaddressable size =    ------     ------
+  far data size        =    ------     ------
+  huge data size       =    ------     ------
+  const size           =    ------     ------
+  hconst size          =         6     ------
+End of Module Information.
+
+C251 COMPILER V5.60.0,  isr                                                                29/09/26  17:14:54  PAGE 9   
+
+
+C251 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

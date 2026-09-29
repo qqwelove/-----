@@ -1,0 +1,317 @@
+C251 COMPILER V5.60.0,  main                                                               29/09/26  15:55:47  PAGE 1   
+
+
+C251 COMPILER V5.60.0, COMPILATION OF MODULE main
+OBJECT MODULE PLACED IN C:\Users\savior\AppData\Local\Temp\dsh-gdKQR1\main_verify.obj
+COMPILER INVOKED BY: D:\keil c251\C251\BIN\C251.EXE ..\user\main.c LARGE FLOAT64 ROM(HUGE) WARNINGLEVEL(3) OPTIMIZE(0,SI
+                    -ZE) BROWSE INCDIR(..\user;..\own_f;..\mdk;..\code;..\..\libraries\doc;..\..\libraries\zf_common;..\..\libraries\zf_compo
+                    -nents;..\..\libraries\zf_device;..\..\libraries\zf_driver) OBJECT(C:\Users\savior\AppData\Local\Temp\dsh-gdKQR1\main_ver
+                    -ify.obj) 
+
+stmt  level    source
+
+    1          #include "zf_common_headfile.h"
+    2          #include "pid.h"
+    3          #include "vofa.h"                                               // VOFA+ 在线调参 / 波形显示
+    4          #include "board.h"
+    5          #include "servo.h"
+    6          #include "motor.h"
+    7          
+    8          
+    9          /*图像缓冲数组*/
+   10          uint8 xdata display_buffer[MT9V03X_H][MT9V03X_W];
+   11          
+   12          /*测试变量区*/
+   13          float speed;
+   14          
+   15          
+   16          /*
+   17          函数声明
+   18          */
+   19          void vofa_send_tick (void);
+   20          
+   21          /*图像显示函数*/
+   22          void image_display (void);
+   23          
+   24          /*自动求阈值*/
+   25          uint8 adapt_threshold(uint8 xdata *image, uint16 col, uint16 row);
+   26          
+   27          
+   28          //-------------------------------------------------------------------------------------------------------
+             -------------
+   29          // VOFA+ 在线调参 示例配置
+   30          //   不需要在线调参时 把 VOFA_DEMO_ENABLE 改成 0 即可（下面所有相关调用会自动消失）
+   31          //-------------------------------------------------------------------------------------------------------
+             -------------
+   32          #define VOFA_DEMO_ENABLE        (1)             // 1 = 打开 VOFA+ 在线调参示例  0 = 关闭
+   33          
+   34          #if VOFA_DEMO_ENABLE
+   35          float vofa_kp = 10.0f;                          // 通道 0 待调参数
+   36          float vofa_ki =  0.5f;                          // 通道 1 待调参数
+   37          float vofa_kd =  2.0f;                          // 通道 2 待调参数
+   38          
+   39          float vofa_wave_target = 0.0f;                  // 通道 3 波形通道（换成你要观察的量 例如目标速度）
+   40          float vofa_wave_now    = 0.0f;                  // 通道 4 波形通道（换成你要观察的量 例如实际速度）
+   41          
+   42          // 参数指针表 数组下标就是 VOFA+ 里设置的通道号
+   43          float *vofa_param_table[4] =
+   44           {
+   45              (float *)&speed_kp,
+   46              (float *)&speed_ki,
+   47              (float *)&speed_kp,
+   48              (float *)&speed,
+   49          };
+   50          
+   51          vuint8 vofa_send_request = 0;                   // 定时器里置位 主循环里发送
+   52          
+   53          
+   54          //-------------------------------------------------------------------------------------------------------
+C251 COMPILER V5.60.0,  main                                                               29/09/26  15:55:47  PAGE 2   
+
+             -------------
+   55          // 函数简介     VOFA+ 波形发送定时器回调（20ms 一次 也就是 50Hz 波形刷新）
+   56          // 备注信息     中断里只置标志位 真正的发送放到主循环里做 避免长时间阻塞中断
+   57          //-------------------------------------------------------------------------------------------------------
+             -------------
+   58          void vofa_send_tick (void)
+   59          {
+   60   1          vofa_send_request = 1;
+   61   1      }
+   62          #endif
+   63          
+   64          
+   65          //-------------------------------------------------------------------------------------------------------
+             -------------
+   66          // 函数简介     屏幕显示摄像头图像 示例函数（总钻风 MT9V03X 灰度图 + IPS200 液晶屏）
+   67          // 参数说明     void
+   68          // 返回参数     void
+   69          // 使用示例     image_display();                     // 放在主循环 while(1) 内反复调用
+   70          // 备注信息     1. 通过 mt9v03x_finish_flag 判断一帧图像是否采集完成 采集完成后才处理 避免画面撕裂
+   71          //              2. 采集完成后先把图像拷贝到 display_buffer 再清除标志位
+   72          //                 拷贝发生在 DMA 还没有启动的空闲窗口内 不会拷到半帧数据
+   73          //                 清除标志位后显示过程不再占用采集 显示和采集互不影响 帧率更高
+   74          //              3. 图像默认 1:1 居中显示 188 * 120 需要满屏可以修改 CAMERA_DIS_W / CAMERA_DIS_H
+   75          //                 ips200_show_gray_image 内部对每个像素都要做一次除法运算 放大显示会明显变慢
+   76          //              4. 不需要防撕裂时 也可以把 mt9v03x_image[0] 直接传给 ips200_show_gray_image 省掉缓冲区
+   77          //-------------------------------------------------------------------------------------------------------
+             -------------
+   78          void image_display (void)
+   79          {
+   80   1          if(mt9v03x_finish_flag)                                             // 一帧图像采集完成
+   81   1          {
+   82   2              uint8 threshold = adapt_threshold((uint8 xdata *)mt9v03x_image,188, 120);
+   83   2              memcpy(display_buffer, mt9v03x_image, sizeof(display_buffer));  // 立刻拷贝一帧图像 此时 DMA 还没
+             -启动 不会拷到半帧数据
+   84   2              mt9v03x_finish_flag = 0;                                        // 清除标志位 放行下一帧采集 显示
+             -过程不再阻塞摄像头
+   85   2      
+   86   2              ips200_show_gray_image(0,    // 显示起始 x 坐标
+   87   2                                     0,    // 显示起始 y 坐标
+   88   2                                     display_buffer[0],                        // 图像首地址
+   89   2                                     MT9V03X_W, MT9V03X_H,                     // 图像实际分辨率 宽 高
+   90   2                                     CAMERA_DIS_W, CAMERA_DIS_H,               // 屏幕上显示的宽 高
+   91   2                                     threshold); // 显示阈值
+   92   2      
+   93   2                  ips200_show_int16(0,150,speed_l);
+   94   2                  ips200_show_int16(0,150 + 16,speed_r);
+   95   2          }
+   96   1      }
+   97          
+   98          /*周期中断服务函数测试*/
+   99          void PIT_Function_Timer0(void)
+  100          {
+  101   1          static uint16 Pid_Count;
+  102   1      
+  103   1      #if VOFA_DEMO_ENABLE
+  104   1          static uint8  VofaCount;                            // VOFA+ 波形发送节拍计数
+  105   1      #endif
+  106   1      
+  107   1          Pid_Count ++; 
+  108   1          VofaCount ++;
+  109   1      
+  110   1      #if VOFA_DEMO_ENABLE
+  111   1          // VOFA+ 波形发送节拍  1ms * 20 = 20ms 发一帧(50Hz)
+  112   1          // 不要再用 pit_ms_init(TIM11_PIT, 20, ...) 来产生这个节拍：库函数 system_delay() 内部占用的
+  113   1          // 就是定时器 11，而 ips200_init() 里的 system_delay_ms() 会把定时器 11 的配置和中断允许位
+  114   1          // 一起清掉(T11CR = 0)，之后 TIM11 中断永远不再产生，波形一帧都发不出去
+C251 COMPILER V5.60.0,  main                                                               29/09/26  15:55:47  PAGE 3   
+
+  115   1          if(VofaCount >= 20)
+  116   1          {
+  117   2              VofaCount = 0;
+  118   2              vofa_send_tick();
+  119   2          }
+  120   1      #endif
+  121   1      
+  122   1          if(Pid_Count >= 5)
+  123   1          {
+  124   2              Pid_Count = 0;
+  125   2              motor_speed_control();
+  126   2          }
+  127   1              
+  128   1      }
+  129          
+  130          /*全部初始化*/
+  131          void init_all(void)
+  132          {
+  133   1          clock_init(SYSTEM_CLOCK_96M);
+  134   1      
+  135   1      #if VOFA_DEMO_ENABLE
+  136   1          vofa_usb_init(vofa_param_table, 4);                                 // 初始化 VOFA+（走 USB 虚拟串口 
+             -插着下载线就行）
+  137   1      
+  138   1      #endif
+  139   1      
+  140   1          /*屏幕初始化部分,注意初始化时序*/
+  141   1          {
+  142   2              ips200_set_dir(IPS200_CROSSWISE_180);
+  143   2          }
+  144   1              ips200_init();
+  145   1          {
+  146   2              ips200_clear(RGB565_BLUE);
+  147   2              ips200_set_color(RGB565_WHITE, RGB565_BLUE);
+  148   2      
+  149   2          }
+  150   1      
+  151   1          servo_init();
+  152   1      
+  153   1          /*已包含encoder_init()*/
+  154   1          motor_init();
+  155   1      
+  156   1          while (mt9v03x_init()) 
+  157   1          {
+  158   2              system_delay_ms(800);
+  159   2          }
+  160   1      
+  161   1          pit_ms_init(TIM0_PIT,1,PIT_Function_Timer0);
+  162   1      }
+  163          
+  164          
+  165          
+  166          
+  167          uint8 adapt_threshold(uint8 xdata *image, uint16 col, uint16 row)   
+  168          {
+  169   1              #define GrayScale 256
+  170   1          uint16 width = col;
+  171   1          uint16 height = row;
+  172   1          int pixelCount[GrayScale];
+  173   1          float pixelPro[GrayScale];
+  174   1          uint16 i, j;
+  175   1                      int pixelSum = 0;
+  176   1          uint8 threshold = 0;
+  177   1              uint32 gray_sum=0;
+  178   1              
+  179   1              float w0, w1, u0tmp, u1tmp, u0, u1, u, deltaTmp, deltaMax = 0;
+C251 COMPILER V5.60.0,  main                                                               29/09/26  15:55:47  PAGE 4   
+
+  180   1              
+  181   1              pixelSum = (width) * (height-60)/9;
+  182   1              
+  183   1          for (i = 0; i < GrayScale; i++)
+  184   1          {
+  185   2              pixelCount[i] = 0;
+  186   2              pixelPro[i] = 0;
+  187   2          }
+  188   1          
+  189   1          for (i = 10; i < height-50 ; i+=3)
+  190   1          {
+  191   2              for (j = 0; j < width; j+=3)
+  192   2              {
+  193   3                      pixelCount[(int)image[i * width + j]]++;  
+  194   3                      gray_sum+=(int)image[i * width + j];       
+  195   3                      }
+  196   2          }
+  197   1      
+  198   1          for (i = 0; i < GrayScale; i++)
+  199   1          {
+  200   2              pixelPro[i] = (float)pixelCount[i] / pixelSum;
+  201   2          }
+  202   1                              w0 = w1 = u0tmp = u1tmp = u0 = u1 = u = deltaTmp = 0;
+  203   1                              for (j = 0; j < GrayScale; j++)
+  204   1                              {
+  205   2                                                              w0 += pixelPro[j];  
+  206   2                                                              u0tmp += j * pixelPro[j]; 
+  207   2      
+  208   2                                                       w1=1-w0;
+  209   2                                                       u1tmp=gray_sum/pixelSum-u0tmp;
+  210   2      
+  211   2                                                              u0 = u0tmp / w0;              
+  212   2                                                              u1 = u1tmp / w1;              
+  213   2                                                              u = u0tmp + u1tmp;           
+  214   2                                                              deltaTmp = w0 * pow((u0 - u), 2) + w1 * pow((u1 - u), 2);
+  215   2                                                              if (deltaTmp > deltaMax)
+  216   2                                                              {
+  217   3                                                                              deltaMax = deltaTmp;
+  218   3                                                                              threshold = (uint8)j;
+  219   3                                                              }
+  220   2                                                              if (deltaTmp < deltaMax)
+  221   2                                                              {
+  222   3                                                              break;
+  223   3                                                              }
+  224   2                               }
+  225   1          return threshold;
+  226   1      }
+  227          
+  228          
+  229          
+  230          
+  231          
+  232          void main(void)
+  233          {
+  234   1          init_all();
+  235   1      
+  236   1          motor_set_target(0,0);
+  237   1          
+  238   1          while(1)
+  239   1          {
+  240   2              image_display();
+  241   2      
+  242   2              motor_set_target(speed,speed);
+  243   2      
+  244   2      /*vofa调参部分*/
+  245   2      #if VOFA_DEMO_ENABLE
+C251 COMPILER V5.60.0,  main                                                               29/09/26  15:55:47  PAGE 5   
+
+  246   2              vofa_apply_param();                                             // 把上位机发来的新参数写进变量（
+             -开销极小 每圈都调用）
+  247   2      
+  248   2              if(vofa_send_request)                                           // 20ms 时间到 发一帧波形给 VOFA+
+  249   2              {
+  250   3                  float wave[5];
+  251   3      
+  252   3                  vofa_send_request = 0;
+  253   3      
+  254   3                  wave[0] = speed_r;                                          // 通道 0
+  255   3                  wave[1] = speed_l;                                          // 通道 1
+  256   3                  wave[2] = speed;                                          // 通道 2
+  257   3                  wave[3] = vofa_wave_target;                                 // 通道 3
+  258   3                  wave[4] = vofa_wave_now;                                    // 通道 4
+  259   3                  vofa_send_wave(wave, 5);                                    // JustFloat 发送
+  260   3              }
+  261   2      #endif    
+  262   2          }
+  263   1      }
+
+
+Module Information          Static   Overlayable
+------------------------------------------------
+  code size            =    ------     ------
+  ecode size           =      1894     ------
+  data size            =    ------     ------
+  idata size           =    ------     ------
+  pdata size           =    ------     ------
+  xdata size           =     24218     ------
+  xdata-const size     =    ------     ------
+  edata size           =    ------     ------
+  bit size             =    ------     ------
+  ebit size            =    ------     ------
+  bitaddressable size  =    ------     ------
+  ebitaddressable size =    ------     ------
+  far data size        =    ------     ------
+  huge data size       =    ------     ------
+  const size           =    ------     ------
+  hconst size          =        74     ------
+End of Module Information.
+
+
+C251 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

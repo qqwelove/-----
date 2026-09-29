@@ -1,0 +1,43 @@
+C251 COMPILER V5.60.0,  servo                                                              29/09/26  17:14:55  PAGE 1   
+
+
+C251 COMPILER V5.60.0, COMPILATION OF MODULE servo
+OBJECT MODULE PLACED IN .\out_file\servo.obj
+COMPILER INVOKED BY: D:\keil c251\C251\BIN\C251.EXE ..\own_f\servo.c LARGE FLOAT64 ROM(HUGE) WARNINGLEVEL(3) OPTIMIZE(0,
+                    -SIZE) BROWSE INCDIR(..\user;..\own_f;..\mdk;..\code;..\..\libraries\doc;..\..\libraries\zf_common;..\..\libraries\zf_com
+                    -ponents;..\..\libraries\zf_device;..\..\libraries\zf_driver) DEBUG PRINT(.\out_file\servo.lst) TABS(2) OBJECT(.\out_file
+                    -\servo.obj) 
+
+stmt  level    source
+
+    1          #include "servo.h"
+    2          
+    3          /*¶æ»ú³õÊ¼»¯*/
+    4          void servo_init(void)
+    5          {
+    6   1        pwm_init(SERVO_PWM_PIN, SERVO_FREQ, SERVO_DUTY(SERVO_MID));
+    7   1      }
+
+
+Module Information          Static   Overlayable
+------------------------------------------------
+  code size            =    ------     ------
+  ecode size           =        27     ------
+  data size            =    ------     ------
+  idata size           =    ------     ------
+  pdata size           =    ------     ------
+  xdata size           =    ------     ------
+  xdata-const size     =    ------     ------
+  edata size           =    ------     ------
+  bit size             =    ------     ------
+  ebit size            =    ------     ------
+  bitaddressable size  =    ------     ------
+  ebitaddressable size =    ------     ------
+  far data size        =    ------     ------
+  huge data size       =    ------     ------
+  const size           =    ------     ------
+  hconst size          =    ------     ------
+End of Module Information.
+
+
+C251 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

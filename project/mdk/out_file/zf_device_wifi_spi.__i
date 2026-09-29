@@ -1,0 +1,1 @@
+"..\..\libraries\zf_device\zf_device_wifi_spi.c" LARGE FLOAT64 ROM(HUGE) WARNINGLEVEL (3) OPTIMIZE (0,SIZE) BROWSE INCDIR(..\user;..\own_f;..\mdk;..\code;..\..\libraries\doc;..\..\libraries\zf_common;..\..\libraries\zf_components;..\..\libraries\zf_device;..\..\libraries\zf_driver) DEBUG PRINT(.\out_file\zf_device_wifi_spi.lst) TABS (2) OBJECT(.\out_file\zf_device_wifi_spi.obj)

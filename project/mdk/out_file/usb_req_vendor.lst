@@ -1,0 +1,56 @@
+C251 COMPILER V5.60.0,  usb_req_vendor                                                     29/09/26  17:14:57  PAGE 1   
+
+
+C251 COMPILER V5.60.0, COMPILATION OF MODULE usb_req_vendor
+OBJECT MODULE PLACED IN .\out_file\usb_req_vendor.obj
+COMPILER INVOKED BY: D:\keil c251\C251\BIN\C251.EXE ..\..\libraries\zf_components\usb_req_vendor.c LARGE FLOAT64 ROM(HUG
+                    -E) WARNINGLEVEL(3) OPTIMIZE(0,SIZE) BROWSE INCDIR(..\user;..\own_f;..\mdk;..\code;..\..\libraries\doc;..\..\libraries\zf
+                    -_common;..\..\libraries\zf_components;..\..\libraries\zf_device;..\..\libraries\zf_driver) DEBUG PRINT(.\out_file\usb_re
+                    -q_vendor.lst) TABS(2) OBJECT(.\out_file\usb_req_vendor.obj) 
+
+stmt  level    source
+
+    1          /*---------------------------------------------------------------------*/
+    2          /* --- STC MCU Limited ------------------------------------------------*/
+    3          /* --- STC 1T Series MCU Demo Programme -------------------------------*/
+    4          /* --- Mobile: (86)13922805190 ----------------------------------------*/
+    5          /* --- Fax: 86-0513-55012956,55012947,55012969 ------------------------*/
+    6          /* --- Tel: 86-0513-55012928,55012929,55012966 ------------------------*/
+    7          /* --- Web: www.STCAI.com ---------------------------------------------*/
+    8          /* --- BBS: www.STCAIMCU.com  -----------------------------------------*/
+    9          /* --- QQ:  800003751 -------------------------------------------------*/
+   10          /* 如果要在程序中使用此代码,请在程序中注明使用了STC的资料及程序        */
+   11          /*---------------------------------------------------------------------*/
+   12          
+   13          #include "stc.h"
+   14          #include "usb.h"
+   15          #include "usb_req_vendor.h"
+   16          
+   17          void usb_req_vendor()
+   18          {
+   19   1          usb_setup_stall();
+   20   1      }
+
+
+Module Information          Static   Overlayable
+------------------------------------------------
+  code size            =    ------     ------
+  ecode size           =         5     ------
+  data size            =    ------     ------
+  idata size           =    ------     ------
+  pdata size           =    ------     ------
+  xdata size           =    ------     ------
+  xdata-const size     =    ------     ------
+  edata size           =    ------     ------
+  bit size             =    ------     ------
+  ebit size            =    ------     ------
+  bitaddressable size  =    ------     ------
+  ebitaddressable size =    ------     ------
+  far data size        =    ------     ------
+  huge data size       =    ------     ------
+  const size           =    ------     ------
+  hconst size          =    ------     ------
+End of Module Information.
+
+
+C251 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
