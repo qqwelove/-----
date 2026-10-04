@@ -1,4 +1,4 @@
-C251 COMPILER V5.60.0,  main                                                               29/09/26  17:39:17  PAGE 1   
+C251 COMPILER V5.60.0,  main                                                               04/10/26  12:51:52  PAGE 1   
 
 
 C251 COMPILER V5.60.0, COMPILATION OF MODULE main
@@ -47,7 +47,7 @@ stmt  level    source
                float vofa_wave_now    = 0.0f;                  // 通道 4 波形通道（换成你要观察的量 例如实际速度）
                
                // 参数指针表 数组下标就是 VOFA+ 里设置的通道号
-               float *vofa_param_table[4] =
+               float *vofa_param_table[4] =;
                 {
                    (float *)&speed_kp,
                    (float *)&speed_ki,
@@ -66,7 +66,7 @@ stmt  level    source
              -------------
                void vofa_send_tick (void)
                {
-C251 COMPILER V5.60.0,  main                                                               29/09/26  17:39:17  PAGE 2   
+C251 COMPILER V5.60.0,  main                                                               04/10/26  12:51:52  PAGE 2   
 
                    vofa_send_request = 1;
                }
@@ -93,7 +93,7 @@ stmt  level    source
                    // 不要再用 pit_ms_init(TIM11_PIT, 20, ...) 来产生这个节拍：库函数 system_delay() 内部占用的
                    // 就是定时器 11，而 ips200_init() 里的 system_delay_ms() 会把定时器 11 的配置和中断允许位
                    // 一起清掉(T11CR = 0)，之后 TIM11 中断永远不再产生，波形一帧都发不出去
-                   if(VofaCount >= 1)
+                   if(VofaCount >= 20)
                    {
                        VofaCount = 0;
                        vofa_send_tick();
@@ -134,7 +134,7 @@ stmt  level    source
   115   1      
   116   1          /*已包含encoder_init()*/
   117   1          motor_init();
-C251 COMPILER V5.60.0,  main                                                               29/09/26  17:39:17  PAGE 3   
+C251 COMPILER V5.60.0,  main                                                               04/10/26  12:51:52  PAGE 3   
 
   118   1      
   119   1          while (mt9v03x_init()) 
@@ -159,25 +159,21 @@ stmt  level    source
   138   1          
   139   1          while(1)
   140   1          {
-  141   2            uint8 i,j;
-  142   2              if(image_update())
-  143   2              {
-  144   3                  for(i = 0;i < 10;i ++)
-  145   3                  {
-  146   4                      for(j = 0;j < 10;j ++)
-  147   4                      {
-  148   5                          image_draw_point(i,j,255);
-  149   5                      }
-  150   4                  }
-  151   3                  
-  152   3                  image_show();
-  153   3                  ips200_show_string(0,200,"okkk");
-  154   3              }
-  155   2      
-  156   2              motor_set_target(speed,speed);
-  157   2      
-  158   2      /*vofa调参部分*/
-  159   2      #if VOFA_DEMO_ENABLE
+  141   2              if (image_update())                     /* 有新帧：算阈值 + 存快照（不清标志） */
+  142   2                  {
+  143   3                      tracking_task();                    /* ★扫线 → 十字补线 → 舵机 */
+*** WARNING C140 IN LINE 143 OF ..\user\main.c: 'tracking_task' undefined; assuming 'extern int tracking_task()'
+  144   3                      tracking_draw();                    /* ★调试期打开：画三条线 */
+*** WARNING C140 IN LINE 144 OF ..\user\main.c: 'tracking_draw' undefined; assuming 'extern int tracking_draw()'
+  145   3                      image_frame_done();                 /* ★处理完才放行，避免撕裂 */
+  146   3                      image_show();
+  147   3                  }
+  148   2      
+  149   2      
+  150   2              // motor_set_target((int16)speed,(int16)speed);
+  151   2      
+  152   2      /*vofa调参部分*/
+  153   2      #if VOFA_DEMO_ENABLE
                        vofa_apply_param();                                             // 把上位机发来的新参数写进变量（
              -开销极小 每圈都调用）
                
@@ -195,20 +191,20 @@ stmt  level    source
                            vofa_send_wave(wave, 5);                                    // JustFloat 发送
                        }
                #endif    
-  176   2          }
-  177   1      }
+  170   2          }
+  171   1      }
 
 
 Module Information          Static   Overlayable
 ------------------------------------------------
   code size            =    ------     ------
-  ecode size           =       393     ------
-C251 COMPILER V5.60.0,  main                                                               29/09/26  17:39:17  PAGE 4   
-
+  ecode size           =       270     ------
   data size            =    ------     ------
   idata size           =    ------     ------
   pdata size           =    ------     ------
-  xdata size           =         8     ------
+  xdata size           =         6     ------
+C251 COMPILER V5.60.0,  main                                                               04/10/26  12:51:52  PAGE 4   
+
   xdata-const size     =    ------     ------
   edata size           =    ------     ------
   bit size             =    ------     ------
@@ -218,8 +214,8 @@ Module Information          Static   Overlayable
   far data size        =    ------     ------
   huge data size       =    ------     ------
   const size           =    ------     ------
-  hconst size          =         7     ------
+  hconst size          =         2     ------
 End of Module Information.
 
 
-C251 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
+C251 COMPILATION COMPLETE.  2 WARNING(S),  0 ERROR(S)

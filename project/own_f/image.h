@@ -13,4 +13,6 @@ void   image_show(void);          /* 只负责显示，可降频、可关闭 */
 uint8  image_get_threshold(void); /* 给 track.c 做二值化用 */
 void   image_draw_point(uint16 row, uint16 col, uint8 gray);  /* 给别的模块往图上画线 */
 
+void image_frame_done(void);
+
 #endif

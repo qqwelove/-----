@@ -1,0 +1,283 @@
+C251 COMPILER V5.60.0,  tracking                                                           04/10/26  12:51:53  PAGE 1   
+
+
+C251 COMPILER V5.60.0, COMPILATION OF MODULE tracking
+OBJECT MODULE PLACED IN .\out_file\tracking.obj
+COMPILER INVOKED BY: D:\keil c251\C251\BIN\C251.EXE ..\own_f\tracking.c LARGE FLOAT64 ROM(HUGE) WARNINGLEVEL(3) OPTIMIZE
+                    -(0,SIZE) BROWSE INCDIR(..\user;..\own_f;..\mdk;..\code;..\..\libraries\doc;..\..\libraries\zf_common;..\..\libraries\zf_
+                    -components;..\..\libraries\zf_device;..\..\libraries\zf_driver) DEBUG PRINT(.\out_file\tracking.lst) TABS(2) OBJECT(.\ou
+                    -t_file\tracking.obj) 
+
+stmt  level    source
+
+    1          #include "tracking.h"
+    2          #include "image.h"
+    3          #include "servo.h"
+    4          
+    5          /* 边线/中线缓存：0 = 最远，119 = 车头 */
+    6          uint8 left_line[IMG_H];
+    7          uint8 right_line[IMG_H];
+    8          uint8 mid_line[IMG_H];
+    9          uint8 left_find_flag[IMG_H];
+   10          uint8 right_find_flag[IMG_H];
+   11          
+   12          uint8 cross_flag = 0;
+   13          
+   14          
+   15          /*-------------------------------------------------------------------
+   16           * 逐行提取左右边线并合成中线
+   17           * 赛道模型：白底 + 两侧黑边线；从上一行中线位置出发，向左右找“白→黑”跳变（黑线内沿）
+   18           * ★丢线时保留哨兵值：左丢 left_line=0，右丢 right_line=IMG_W-1
+   19           *    —— cross_fill_new 的 LOST_THRESHOLD 判据就是靠这两个值识别丢线的，千万别改！
+   20           *------------------------------------------------------------------*/
+   21          void scan_lines(uint8 threshold, uint8 *left_line, uint8 *right_line, uint8 *mid_line,
+   22                          uint8 start_row, uint8 end_row)
+   23          {
+   24   1          int16 row, col;
+   25   1          int16 left, right, m;
+   26   1          uint8 center = IMG_CENTER;
+   27   1      
+   28   1          for (row = start_row; row >= (int16)end_row; row--)
+   29   1          {
+   30   2              left  = -1;
+   31   2              right = -1;
+   32   2      
+   33   2              /* 左边界：从 center 向左找 白→黑 跳变（黑线右沿 = 白路面左边界） */
+   34   2              for (col = center; col >= 3; col--)
+   35   2              {
+   36   3                  if (mt9v03x_image[row][col] > threshold && mt9v03x_image[row][col - 1] <= threshold)
+   37   3                  { left = col; break; }
+   38   3              }
+   39   2              /* 右边界：从 center 向右找 白→黑 跳变 */
+   40   2              for (col = center; col < IMG_W - 3; col++)
+   41   2              {
+   42   3                  if (mt9v03x_image[row][col] > threshold && mt9v03x_image[row][col + 1] <= threshold)
+   43   3                  { right = col; break; }
+   44   3              }
+   45   2      
+   46   2              /* 存边线：丢线保留哨兵值 + 置标志位 */
+   47   2              if (left  < 0) { left_find_flag[row]  = 0; left_line[row]  = 0;           }
+   48   2              else           { left_find_flag[row]  = 1; left_line[row]  = (uint8)left; }
+   49   2      
+   50   2              if (right < 0) { right_find_flag[row] = 0; right_line[row] = IMG_W - 1;   }
+   51   2              else           { right_find_flag[row] = 1; right_line[row] = (uint8)right;}
+   52   2      
+   53   2              /* 合成中线：单边丢线用半赛道宽推算，双边丢线继承更近的一行
+   54   2                 ★只写 mid_line，绝对不要回写 left_line / right_line！ */
+   55   2              if      (left_find_flag[row] && right_find_flag[row])
+   56   2                  m = ((int16)left_line[row] + (int16)right_line[row]) / 2;
+C251 COMPILER V5.60.0,  tracking                                                           04/10/26  12:51:53  PAGE 2   
+
+   57   2              else if (right_find_flag[row])
+   58   2                  m = (int16)right_line[row] - HALF_WIDTH;      /* 左丢 → 靠右线推 */
+   59   2              else if (left_find_flag[row])
+   60   2                  m = (int16)left_line[row] + HALF_WIDTH;       /* 右丢 → 靠左线推 */
+   61   2              else
+   62   2                  m = (row < START_ROW) ? mid_line[row + 1] : IMG_CENTER;   /* 都丢 → 继承更近那行 */
+   63   2      
+   64   2              if (m < 0)         m = 0;
+   65   2              if (m > IMG_W - 1) m = IMG_W - 1;
+   66   2              mid_line[row] = (uint8)m;
+   67   2      
+   68   2              /* 下一行的搜索种子 = 本行中线（限幅防跑飞） */
+   69   2              center = (uint8)m;
+   70   2              if (center < SEARCH_RANGE)         center = SEARCH_RANGE;
+   71   2              if (center > IMG_W - SEARCH_RANGE) center = IMG_W - SEARCH_RANGE;
+   72   2          }
+   73   1      }
+   74          
+   75          
+   76          //======================================== 十字路口检测与补线函数 =======================================
+             -=
+   77          /**
+   78           * @brief  十字路口检测与补线（上下双向扫描四跳变点法）
+   79           * @note   从上到下、从下到上分别扫描左右边线的跳变点（有效→丢线），
+   80           *         检测到 3 个或 4 个跳变点即判定为十字路口，
+   81           *         用上下有效边界做线性插值填充十字区域的边线，中线置为图像中心直行通过。
+   82           * @param  left_line   左边界数组（需预分配 IMG_H 大小）
+   83           * @param  right_line  右边界数组（需预分配 IMG_H 大小）
+   84           * @param  mid_line    中线数组（需预分配 IMG_H 大小）
+   85           * @return uint8       检测到十字路口返回 1，否则返回 0
+   86           */
+   87          uint8 cross_fill_new(uint8 *left_line, uint8 *right_line, uint8 *mid_line)
+   88          {
+   89   1          int row;
+   90   1          int top_l = -1, top_r = -1;    // 上跳变点行：自上而下扫描，有效→丢线的跳变位置
+   91   1          int btm_l = -1, btm_r = -1;    // 下跳变点行：自下而上扫描，有效→丢线的跳变位置
+   92   1          int break_cnt;                  // 跳变点计数
+   93   1          int top_row, btm_row;          // 统一的上/下跳变点行
+   94   1          int range, y_diff;
+   95   1          static uint8 crossed_flag = 0; // 连续防抖计数
+   96   1      
+   97   1          #define JUMP_THRESHOLD      20   // 跳变阈值：相邻行差值超过此值即判定跳变
+   98   1          #define LOST_THRESHOLD      30   // 丢线阈值：左<此值 或 右>IMG_W-此值
+   99   1      
+  100   1          // ---- 1. 自上而下扫描：找上跳变点（正常赛道→十字区域） ----
+  101   1          for (row = END_ROW; row < IMG_H - 10; row++)
+  102   1          {
+  103   2              // 左跳变：正常值跳变为极小值（下行丢线）
+  104   2              if (top_l < 0 && (int)left_line[row] - (int)left_line[row + 1] > JUMP_THRESHOLD
+  105   2                  && left_line[row + 1] < LOST_THRESHOLD)
+  106   2                  top_l = row;
+  107   2              // 右跳变：正常值跳变为极大值（下行丢线）
+  108   2              if (top_r < 0 && (int)right_line[row + 1] - (int)right_line[row] > JUMP_THRESHOLD
+  109   2                  && right_line[row + 1] > IMG_W - 1 - LOST_THRESHOLD)
+  110   2                  top_r = row;
+  111   2              if (top_l >= 0 && top_r >= 0)
+  112   2                  break;
+  113   2          }
+  114   1      
+  115   1          // ---- 2. 自下而上扫描：找下跳变点（正常赛道→十字区域） ----
+  116   1          for (row = IMG_H - 1; row > END_ROW + 10; row--)
+  117   1          {
+  118   2              // 左跳变：正常值跳变为极小值（上行丢线）
+  119   2              if (btm_l < 0 && (int)left_line[row - 1] - (int)left_line[row] > JUMP_THRESHOLD
+  120   2                  && left_line[row] < LOST_THRESHOLD)
+  121   2                  btm_l = row - 1;
+C251 COMPILER V5.60.0,  tracking                                                           04/10/26  12:51:53  PAGE 3   
+
+  122   2              // 右跳变：正常值跳变为极大值（上行丢线）
+  123   2              if (btm_r < 0 && (int)right_line[row] - (int)right_line[row - 1] > JUMP_THRESHOLD
+  124   2                  && right_line[row] > IMG_W - 1 - LOST_THRESHOLD)
+  125   2                  btm_r = row - 1;
+  126   2              if (btm_l >= 0 && btm_r >= 0)
+  127   2                  break;
+  128   2          }
+  129   1      
+  130   1          // ---- 3. 统计跳变点数量 ----
+  131   1          break_cnt = 0;
+  132   1          if (top_l >= 0) break_cnt++;
+  133   1          if (top_r >= 0) break_cnt++;
+  134   1          if (btm_l >= 0) break_cnt++;
+  135   1          if (btm_r >= 0) break_cnt++;
+  136   1      
+  137   1          // ---- 4. 跳变点 < 3：不是十字路口，释放补线 ----
+  138   1          if (break_cnt < 3)
+  139   1          {
+  140   2              crossed_flag = 0;
+  141   2              return 0;
+  142   2          }
+  143   1      
+  144   1          // ---- 5. 防抖：连续两帧检测到才触发 ----
+  145   1          if (crossed_flag == 0)
+  146   1          {
+  147   2              crossed_flag = 1;
+  148   2              return 0;
+  149   2          }
+  150   1      
+  151   1          // ---- 6. 取统一的上/下跳变点行（处理只有 3 个跳变点的情况） ----
+  152   1          // 上跳变点行：取两个上跳变点中靠下方的（更深入十字区域）
+  153   1          top_row = -1;
+  154   1          if (top_l >= 0 && top_r >= 0)
+  155   1              top_row = (top_l > top_r) ? top_l : top_r;
+  156   1          else if (top_l >= 0)
+  157   1              top_row = top_l;
+  158   1          else if (top_r >= 0)
+  159   1              top_row = top_r;
+  160   1      
+  161   1          // 下跳变点行：取两个下跳变点中靠上方的
+  162   1          btm_row = -1;
+  163   1          if (btm_l >= 0 && btm_r >= 0)
+  164   1              btm_row = (btm_l < btm_r) ? btm_l : btm_r;
+  165   1          else if (btm_l >= 0)
+  166   1              btm_row = btm_l;
+  167   1          else if (btm_r >= 0)
+  168   1              btm_row = btm_r;
+  169   1      
+  170   1          if (top_row < 0 || btm_row < 0 || top_row >= btm_row) return 0;
+  171   1      
+  172   1          // ---- 7. 线性插值填充十字区域的边线，利用四个拐点计算中线 ----
+  173   1          range = btm_row - top_row;
+  174   1          for (row = top_row; row <= btm_row; row++)
+  175   1          {
+  176   2              y_diff = row - top_row;
+  177   2              // 左边线：上跳变点 → 下跳变点 线性插值
+  178   2              left_line[row] = (uint8)((int)left_line[top_row]
+  179   2                                + ((int)left_line[btm_row] - (int)left_line[top_row]) * y_diff / range);
+  180   2              // 右边线：上跳变点 → 下跳变点 线性插值
+  181   2              right_line[row] = (uint8)((int)right_line[top_row]
+  182   2                                 + ((int)right_line[btm_row] - (int)right_line[top_row]) * y_diff / range);
+  183   2              // 中线：基于四个拐点插值后的左右边线取中点
+  184   2              mid_line[row] = (uint8)(((int)left_line[row] + (int)right_line[row]) / 2);
+  185   2          }
+  186   1          return 1;
+  187   1      }
+C251 COMPILER V5.60.0,  tracking                                                           04/10/26  12:51:53  PAGE 4   
+
+  188          
+  189          
+  190          float compute_servo_angle(uint8 *mid_line, uint8 row, uint8 center_col,
+  191                                    float kp, float kd, float mid_angle, float min_angle, float max_angle)
+  192          {
+  193   1          #define DEAD_ZONE   2               /* 死区，防直道抖舵 */
+  194   1          static int16 last_err = 0;
+  195   1          int16 err;
+  196   1          float d_err, offset, target;
+  197   1      
+  198   1          err = (int16)mid_line[row] - (int16)center_col;
+  199   1          if (err > -DEAD_ZONE && err < DEAD_ZONE) err = 0;
+  200   1      
+  201   1          d_err    = (float)(err - last_err);
+  202   1          last_err = err;
+  203   1      
+  204   1          offset = kp * err + kd * d_err;
+  205   1          target = mid_angle - offset;        /* 中线偏右(err>0) → 角度变小 → 右转 */
+  206   1      
+  207   1          if (target > max_angle) target = max_angle;
+  208   1          if (target < min_angle) target = min_angle;
+  209   1          return target;
+  210   1      }
+  211          
+  212          
+  213          /* 巡线总流程：主循环在 image_update() 之后、image_frame_done() 之前调用 */
+  214          void tracking_task(void)
+  215          {
+  216   1          scan_lines(image_get_threshold(), left_line, right_line, mid_line, START_ROW, END_ROW);
+  217   1          cross_flag = cross_fill_new(left_line, right_line, mid_line);
+  218   1      
+  219   1          servo_set_angle( compute_servo_angle(mid_line, CONTROL_ROW, IMG_CENTER,
+  220   1                                               servo_kp, servo_kd,
+  221   1                                               SERVO_MID, SERVO_RIGHT_MAX, SERVO_LEFT_MEX) );
+  222   1      
+  223   1          /* ★以后元素判断（环岛/斑马线/出界）就插在这一行前面，改完 mid_line 再算角度 */
+  224   1      }
+  225          
+  226          
+  227          /* 调试：把左右边线和中线画到快照上，配合 image_show() 用 */
+  228          void tracking_draw(void)
+  229          {
+  230   1          uint8 row;
+  231   1          for (row = END_ROW; row <= START_ROW; row++)
+  232   1          {
+  233   2              image_draw_point(row, left_line[row],  0);      /* 左边线 → 黑 */
+  234   2              image_draw_point(row, right_line[row], 255);    /* 右边线 → 白 */
+  235   2              image_draw_point(row, mid_line[row],   128);    /* 中线   → 灰 */
+  236   2          }
+  237   1          image_draw_point(CONTROL_ROW, mid_line[CONTROL_ROW], 255);   /* 控制行打点 */
+  238   1      }
+
+
+Module Information          Static   Overlayable
+------------------------------------------------
+  code size            =    ------     ------
+  ecode size           =      3197     ------
+  data size            =    ------     ------
+  idata size           =    ------     ------
+  pdata size           =    ------     ------
+  xdata size           =       703     ------
+  xdata-const size     =    ------     ------
+  edata size           =    ------     ------
+  bit size             =    ------     ------
+  ebit size            =    ------     ------
+  bitaddressable size  =    ------     ------
+  ebitaddressable size =    ------     ------
+C251 COMPILER V5.60.0,  tracking                                                           04/10/26  12:51:53  PAGE 5   
+
+  far data size        =    ------     ------
+  huge data size       =    ------     ------
+  const size           =    ------     ------
+  hconst size          =        19     ------
+End of Module Information.
+
+
+C251 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

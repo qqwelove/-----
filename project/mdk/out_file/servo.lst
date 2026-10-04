@@ -1,4 +1,4 @@
-C251 COMPILER V5.60.0,  servo                                                              29/09/26  17:14:55  PAGE 1   
+C251 COMPILER V5.60.0,  servo                                                              04/10/26  12:51:52  PAGE 1   
 
 
 C251 COMPILER V5.60.0, COMPILATION OF MODULE servo
@@ -12,21 +12,37 @@ stmt  level    source
 
     1          #include "servo.h"
     2          
-    3          /*舵机初始化*/
-    4          void servo_init(void)
-    5          {
-    6   1        pwm_init(SERVO_PWM_PIN, SERVO_FREQ, SERVO_DUTY(SERVO_MID));
-    7   1      }
+    3          
+    4          
+    5          /* ★定义成变量（不是宏），VOFA 才能取地址在线调 */
+    6          float servo_kp = 0.31f;
+    7          float servo_kd = 0.05f;
+    8          
+    9          
+   10          
+   11          /*舵机初始化*/
+   12          void servo_init(void)
+   13          {
+   14   1        pwm_init(SERVO_PWM_PIN, SERVO_FREQ, SERVO_DUTY(SERVO_MID));
+   15   1      }
+   16          
+   17          
+   18          void servo_set_angle(float angle)
+   19          {
+   20   1          if (angle < SERVO_RIGHT_MAX) angle = SERVO_RIGHT_MAX;   /* 76  最右 */
+   21   1          if (angle > SERVO_LEFT_MEX)  angle = SERVO_LEFT_MEX;    /* 99.5 最左 */
+   22   1          pwm_set_duty(SERVO_PWM_PIN, (uint32)SERVO_DUTY(angle));
+   23   1      }
 
 
 Module Information          Static   Overlayable
 ------------------------------------------------
   code size            =    ------     ------
-  ecode size           =        27     ------
+  ecode size           =       176     ------
   data size            =    ------     ------
   idata size           =    ------     ------
   pdata size           =    ------     ------
-  xdata size           =    ------     ------
+  xdata size           =        12     ------
   xdata-const size     =    ------     ------
   edata size           =    ------     ------
   bit size             =    ------     ------
@@ -36,7 +52,7 @@ Module Information          Static   Overlayable
   far data size        =    ------     ------
   huge data size       =    ------     ------
   const size           =    ------     ------
-  hconst size          =    ------     ------
+  hconst size          =        18     ------
 End of Module Information.
 
 

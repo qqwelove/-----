@@ -29,7 +29,7 @@ void encoder_update(void)
 }
 
 /*结构体成员初始化*/
-void motor_param_imit(void)
+void motor_param_init(void)
 {
     Left_SpeedPidStructure.outmax = 8000;
     Left_SpeedPidStructure.outmin = -8000;
@@ -42,7 +42,7 @@ void motor_param_imit(void)
 void motor_init(void) 
 {
     encoder_init();
-    motor_param_imit();
+    motor_param_init();
 
     gpio_init(DIR_1, GPO, GPIO_HIGH, GPO_PUSH_PULL);
     gpio_init(DIR_2, GPO, GPIO_HIGH, GPO_PUSH_PULL);

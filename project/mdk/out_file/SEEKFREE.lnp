@@ -42,6 +42,7 @@
 ".\out_file\servo.obj",
 ".\out_file\motor.obj",
 ".\out_file\image.obj",
+".\out_file\tracking.obj",
 ".\out_file\seekfree_assistant.obj",
 ".\out_file\seekfree_assistant_inface.obj",
 ".\out_file\seekfree_assistant_interface.obj",

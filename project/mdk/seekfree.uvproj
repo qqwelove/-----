@@ -802,6 +802,16 @@
               <FileType>5</FileType>
               <FilePath>..\own_f\image.h</FilePath>
             </File>
+            <File>
+              <FileName>tracking.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\own_f\tracking.c</FilePath>
+            </File>
+            <File>
+              <FileName>tracking.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\own_f\tracking.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

@@ -22,8 +22,6 @@
 #define SERVO_MID          88.5f  //正中
 #define SERVO_RIGHT_MAX    76.0f //最右
 #define SERVO_LEFT_MEX     99.5f  //最左
-#define SERVO_KP           0.31f   // 比例系数       0.45      0.32
-#define SERVO_KD           0.05f   // 建议初始值 0.15~0.30  0.22  0.05
 
 /*电机配置*/
 #define DIR_1               ( IO_P75 )//右电机

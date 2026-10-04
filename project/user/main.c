@@ -33,7 +33,7 @@ float vofa_wave_target = 0.0f;                  // 通道 3 波形通道（换成你要观察
 float vofa_wave_now    = 0.0f;                  // 通道 4 波形通道（换成你要观察的量 例如实际速度）
 
 // 参数指针表 数组下标就是 VOFA+ 里设置的通道号
-float *vofa_param_table[4] =
+float *vofa_param_table[4] =;
  {
     (float *)&speed_kp,
     (float *)&speed_ki,
@@ -75,7 +75,7 @@ void PIT_Function_Timer0(void)
     // 不要再用 pit_ms_init(TIM11_PIT, 20, ...) 来产生这个节拍：库函数 system_delay() 内部占用的
     // 就是定时器 11，而 ips200_init() 里的 system_delay_ms() 会把定时器 11 的配置和中断允许位
     // 一起清掉(T11CR = 0)，之后 TIM11 中断永远不再产生，波形一帧都发不出去
-    if(VofaCount >= 1)
+    if(VofaCount >= 20)
     {
         VofaCount = 0;
         vofa_send_tick();
@@ -138,12 +138,16 @@ void main(void)
     
     while(1)
     {
-        if(image_update())
-        {
-            image_show();
-        }
+        if (image_update())                     /* 有新帧：算阈值 + 存快照（不清标志） */
+            {
+                tracking_task();                    /* ★扫线 → 十字补线 → 舵机 */
+                tracking_draw();                    /* ★调试期打开：画三条线 */
+                image_frame_done();                 /* ★处理完才放行，避免撕裂 */
+                image_show();
+            }
 
-        motor_set_target(speed,speed);
+
+        // motor_set_target((int16)speed,(int16)speed);
 
 /*vofa调参部分*/
 #if VOFA_DEMO_ENABLE

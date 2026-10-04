@@ -1,4 +1,4 @@
-C251 COMPILER V5.60.0,  motor                                                              29/09/26  17:14:55  PAGE 1   
+C251 COMPILER V5.60.0,  motor                                                              04/10/26  12:51:52  PAGE 1   
 
 
 C251 COMPILER V5.60.0, COMPILATION OF MODULE motor
@@ -41,7 +41,7 @@ stmt  level    source
    29   1      }
    30          
    31          /*结构体成员初始化*/
-   32          void motor_param_imit(void)
+   32          void motor_param_init(void)
    33          {
    34   1          Left_SpeedPidStructure.outmax = 8000;
    35   1          Left_SpeedPidStructure.outmin = -8000;
@@ -54,7 +54,7 @@ stmt  level    source
    42          void motor_init(void) 
    43          {
    44   1          encoder_init();
-   45   1          motor_param_imit();
+   45   1          motor_param_init();
    46   1      
    47   1          gpio_init(DIR_1, GPO, GPIO_HIGH, GPO_PUSH_PULL);
    48   1          gpio_init(DIR_2, GPO, GPIO_HIGH, GPO_PUSH_PULL);
@@ -66,7 +66,7 @@ stmt  level    source
    54          void motor_set_target(int16 speedl,int16 speedr)
    55          {
    56   1          target_l = speedl;
-C251 COMPILER V5.60.0,  motor                                                              29/09/26  17:14:55  PAGE 2   
+C251 COMPILER V5.60.0,  motor                                                              04/10/26  12:51:52  PAGE 2   
 
    57   1          target_r = speedr;
    58   1      }
@@ -135,7 +135,7 @@ Module Information          Static   Overlayable
   edata size           =    ------     ------
   bit size             =    ------     ------
   ebit size            =    ------     ------
-C251 COMPILER V5.60.0,  motor                                                              29/09/26  17:14:55  PAGE 3   
+C251 COMPILER V5.60.0,  motor                                                              04/10/26  12:51:52  PAGE 3   
 
   bitaddressable size  =    ------     ------
   ebitaddressable size =    ------     ------
