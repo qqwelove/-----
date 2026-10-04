@@ -11,6 +11,8 @@ static PID_T Left_SpeedPidStructure,Right_SpeedPidStructure;
 
 static volatile int16  target_l = 0, target_r = 0;
 
+static uint8 motor_enable = 1;                    /* ★总开关 */
+
 /*编码器初始化*/
 void encoder_init(void)
 {
@@ -38,6 +40,8 @@ void motor_param_init(void)
     Right_SpeedPidStructure.outmin = -8000;
 }
 
+
+
 /*电机初始化*/
 void motor_init(void) 
 {
@@ -50,9 +54,12 @@ void motor_init(void)
     pwm_init(PWM_2, 17000, 0);
 }
 
+void motor_enable_set(uint8 en) { motor_enable = en ? 1 : 0; }
+
 /*电机速度控制*/
 void motor_set_target(int16 speedl,int16 speedr)
 {
+    if (!motor_enable) { speedl = 0; speedr = 0; }  /* 守门 */
     target_l = speedl;
     target_r = speedr;
 }
@@ -60,6 +67,7 @@ void motor_set_target(int16 speedl,int16 speedr)
 /*电机停转*/
 void motor_stop(void)
 {
+    motor_enable = 0;  /* ★锁死：之后谁写 target 都没用了 */
     motor_set_target(0,0);
 }
 

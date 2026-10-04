@@ -17,5 +17,6 @@ void motor_init(void);
 void motor_set_target(int16 speedl,int16 speedr);
 void motor_speed_control(void);     /* 由 1ms 中断分频后调用 */
 void motor_stop(void);
+void motor_enable_set(uint8 en);
 
 #endif

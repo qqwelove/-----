@@ -1,6 +1,7 @@
 #include "tracking.h"
 #include "image.h"
 #include "servo.h"
+#include "motor.h"
 
 /* 边线/中线缓存：0 = 最远，119 = 车头 */
 uint8 left_line[IMG_H];
@@ -11,6 +12,18 @@ uint8 right_find_flag[IMG_H];
 
 uint8 cross_flag = 0;
 
+
+/* 每行的半赛道宽：跨帧记忆，自己标定（重平滑，抗噪）
+   ★注意：它是“同一行上左右边线的水平距离的一半”，已经含了 √(1+m2) 因子，
+     所以单边推算时【直接用它做水平偏移就是对的】，不要再乘任何法向系数。 */
+static int16 half_w_mem[IMG_H];
+#define HALF_W_DEF   45      /* 还没学到之前的默认值 */
+#define HALF_W_MIN   10
+#define HALF_W_MAX   70
+
+/* 【调试开关】中线滑动平均窗口：3 或 5（越大越平滑，但越滞后） */
+#define MID_FILTER_WIN   3
+#define MID_HALF         (MID_FILTER_WIN / 2)
 
 /*-------------------------------------------------------------------
  * 逐行提取左右边线并合成中线
@@ -24,6 +37,9 @@ void scan_lines(uint8 threshold, uint8 *left_line, uint8 *right_line, uint8 *mid
     int16 row, col;
     int16 left, right, m;
     uint8 center = IMG_CENTER;
+    int16 last_w = HALF_W_DEF;
+    static uint8 mid_head_mem = IMG_CENTER;
+    uint8 head_fallback = mid_head_mem;
 
     for (row = start_row; row >= (int16)end_row; row--)
     {
@@ -52,138 +68,267 @@ void scan_lines(uint8 threshold, uint8 *left_line, uint8 *right_line, uint8 *mid
 
         /* 合成中线：单边丢线用半赛道宽推算，双边丢线继承更近的一行
            ★只写 mid_line，绝对不要回写 left_line / right_line！ */
-        if      (left_find_flag[row] && right_find_flag[row])
-            m = ((int16)left_line[row] + (int16)right_line[row]) / 2;
-        else if (right_find_flag[row])
-            m = (int16)right_line[row] - HALF_WIDTH;      /* 左丢 → 靠右线推 */
-        else if (left_find_flag[row])
-            m = (int16)left_line[row] + HALF_WIDTH;       /* 右丢 → 靠左线推 */
-        else
-            m = (row < START_ROW) ? mid_line[row + 1] : IMG_CENTER;   /* 都丢 → 继承更近那行 */
-
+        if (left_find_flag[row] && right_find_flag[row])
+                {
+                    int16 w = ((int16)right_line[row] - (int16)left_line[row]) / 2;
+                
+                    /* ★在线标定“这一行”的半宽 */
+                    if (w > HALF_W_MIN && w < HALF_W_MAX)
+                    {
+                        if (half_w_mem[row] == 0) half_w_mem[row] = w;
+                        else half_w_mem[row] = (half_w_mem[row] * 3 + 1 * w) / 4;   /* 1/4 步长平滑 */
+                        last_w = half_w_mem[row];
+                    }
+                    m = ((int16)left_line[row] + (int16)right_line[row]) / 2;
+                
+                    /* 种子只在双边都在时更新（防跑飞，这条要保留） */
+                    center = (uint8)m;
+                    if (center < SEARCH_RANGE)         center = SEARCH_RANGE;
+                    if (center > IMG_W - SEARCH_RANGE) center = IMG_W - SEARCH_RANGE;
+                }
+        else if (right_find_flag[row])          /* 左丢 → 靠右线 + 该行半宽 */
+        {
+            int16 hw = (half_w_mem[row] != 0) ? half_w_mem[row] : last_w;
+            m = (int16)right_line[row] - hw;
+        }
+        else if (left_find_flag[row])           /* 右丢 → 靠左线 + 该行半宽 */
+        {
+            int16 hw = (half_w_mem[row] != 0) ? half_w_mem[row] : last_w;
+            m = (int16)left_line[row] + hw;
+        }
+        else                                    /* 都丢 → 继承更近的一行 */
+        {
+            m = (row < START_ROW) ? mid_line[row + 1] : head_fallback;
+        }
+    
         if (m < 0)         m = 0;
         if (m > IMG_W - 1) m = IMG_W - 1;
+        if (row == START_ROW && (left_find_flag[row] || right_find_flag[row]))
+            mid_head_mem = (uint8)m;
+
         mid_line[row] = (uint8)m;
 
-        /* 下一行的搜索种子 = 本行中线（限幅防跑飞） */
-        center = (uint8)m;
-        if (center < SEARCH_RANGE)         center = SEARCH_RANGE;
-        if (center > IMG_W - SEARCH_RANGE) center = IMG_W - SEARCH_RANGE;
     }
 }
 
 
-//======================================== 十字路口检测与补线函数 ========================================
-/**
- * @brief  十字路口检测与补线（上下双向扫描四跳变点法）
- * @note   从上到下、从下到上分别扫描左右边线的跳变点（有效→丢线），
- *         检测到 3 个或 4 个跳变点即判定为十字路口，
- *         用上下有效边界做线性插值填充十字区域的边线，中线置为图像中心直行通过。
- * @param  left_line   左边界数组（需预分配 IMG_H 大小）
- * @param  right_line  右边界数组（需预分配 IMG_H 大小）
- * @param  mid_line    中线数组（需预分配 IMG_H 大小）
- * @return uint8       检测到十字路口返回 1，否则返回 0
- */
-uint8 cross_fill_new(uint8 *left_line, uint8 *right_line, uint8 *mid_line)
+/*============================== 出界保护：车头前面变黑 → 直接停机 ==============================*/
+/*-------------------------------------------------------------------
+ * 判据只有一条：采样“车头前面那块区域”的平均灰度，低于 TRACK_OUT_MEAN 就认为冲出赛道。
+ *
+ * ★为什么不用大津阈值去算“黑点比例”：
+ *   大津阈值是从同一批像素算出来的，它总会把直方图劈成两半，
+ *   于是“按大津阈值统计的黑点比例”会被自适应掉（出界了也常常只有 50% 左右），
+ *   能不能触发还取决于 image.c 里的限幅值 —— 自指涉的坏判据，已弃用。
+ * ★为什么用【平均灰度】而不是【比例】：
+ *   平均灰度是绝对量，不依赖任何动态阈值，算一次、标一次就固定，简单可靠。
+ * ★为什么只采样“车头前面”：
+ *   车还在不在赛道上，看车头前面那块地最准：
+ *     十字路口中间是白的 → 平均灰度很高 → 不会误判
+ *     冲出赛道对着暗地面 → 平均灰度很低 → 触发
+ * ★必须在主循环里调用（要遍历图像）；绝对不要塞进 1ms / 5ms 定时中断。
+ *
+ * 【怎么标定 TRACK_OUT_MEAN】把 track_out_mean_min 打到屏上看：
+ *   ① 正常在赛道上跑一圈，记下 track_out_mean_min（这是"赛道上最暗"的值，比如 120）
+ *   ② 故意冲出赛道，记下 track_out_mean_min（会掉得很低，比如 35）
+ *   ③ TRACK_OUT_MEAN 取两者中间（例如 (120+35)/2 ≈ 78），留出余量
+ *------------------------------------------------------------------*/
+#define TRACK_OUT_MEAN      100   /* ★车头前面平均灰度低于这个值 → 判为出界（按上面方法标定） */
+#define TRACK_OUT_CONFIRM   3    /* 连续这么多帧成立才算，防单帧误判 */
+#define TRACK_OUT_LATCH     1    /* 1 = 判出后永久停机（比赛用）  0 = 条件消失自动恢复（调试用） */
+
+uint8 track_out_flag     = 0;    /* 1 = 已判出界（锁存） */
+uint8 track_out_cnt      = 0;    /* 连续命中帧数 */
+uint8 track_out_mean     = 0;    /* ★调试用：本帧“车头前面”的平均灰度 */
+uint8 track_out_mean_min = 255;  /* ★调试用：开机以来见过的最小平均灰度（峰值保持，标定就看它） */
+
+
+/*-------------------------------------------------------------------
+ * 出界检测：返回 1 = 出界
+ * 采样范围：第 60~119 行（车头那半边），隔 3 列取一点
+ *------------------------------------------------------------------*/
+uint8 track_out_check(void)
 {
-    int row;
-    int top_l = -1, top_r = -1;    // 上跳变点行：自上而下扫描，有效→丢线的跳变位置
-    int btm_l = -1, btm_r = -1;    // 下跳变点行：自下而上扫描，有效→丢线的跳变位置
-    int break_cnt;                  // 跳变点计数
-    int top_row, btm_row;          // 统一的上/下跳变点行
-    int range, y_diff;
-    static uint8 crossed_flag = 0; // 连续防抖计数
+    uint16 row, col;
+    uint32 sum = 0;
+    uint16 total = 0;
 
-    #define JUMP_THRESHOLD      20   // 跳变阈值：相邻行差值超过此值即判定跳变
-    #define LOST_THRESHOLD      30   // 丢线阈值：左<此值 或 右>IMG_W-此值
+    if (TRACK_OUT_LATCH && track_out_flag) return 1;        /* 已锁存 → 直接返回 */
 
-    // ---- 1. 自上而下扫描：找上跳变点（正常赛道→十字区域） ----
-    for (row = END_ROW; row < IMG_H - 10; row++)
+    for (row = 60; row <= 119; row += 3)
     {
-        // 左跳变：正常值跳变为极小值（下行丢线）
-        if (top_l < 0 && (int)left_line[row] - (int)left_line[row + 1] > JUMP_THRESHOLD
-            && left_line[row + 1] < LOST_THRESHOLD)
-            top_l = row;
-        // 右跳变：正常值跳变为极大值（下行丢线）
-        if (top_r < 0 && (int)right_line[row + 1] - (int)right_line[row] > JUMP_THRESHOLD
-            && right_line[row + 1] > IMG_W - 1 - LOST_THRESHOLD)
-            top_r = row;
-        if (top_l >= 0 && top_r >= 0)
-            break;
+        for (col = 5; col < IMG_W - 5; col += 3)
+        {
+            sum += mt9v03x_image[row][col];
+            total++;
+        }
     }
 
-    // ---- 2. 自下而上扫描：找下跳变点（正常赛道→十字区域） ----
-    for (row = IMG_H - 1; row > END_ROW + 10; row--)
+    if (total == 0) return 0;
+
+    track_out_mean = (uint8)(sum / total);                  /* 本帧平均值 */
+
+    if (track_out_mean < track_out_mean_min)                /* 峰值保持：记住最暗的那一帧 */
+        track_out_mean_min = track_out_mean;
+
+    if (track_out_mean < TRACK_OUT_MEAN)                    /* ★唯一的判据 */
     {
-        // 左跳变：正常值跳变为极小值（上行丢线）
-        if (btm_l < 0 && (int)left_line[row - 1] - (int)left_line[row] > JUMP_THRESHOLD
-            && left_line[row] < LOST_THRESHOLD)
-            btm_l = row - 1;
-        // 右跳变：正常值跳变为极大值（上行丢线）
-        if (btm_r < 0 && (int)right_line[row] - (int)right_line[row - 1] > JUMP_THRESHOLD
-            && right_line[row] > IMG_W - 1 - LOST_THRESHOLD)
-            btm_r = row - 1;
-        if (btm_l >= 0 && btm_r >= 0)
-            break;
+        if (track_out_cnt < 250) track_out_cnt++;
+        if (track_out_cnt >= TRACK_OUT_CONFIRM) track_out_flag = 1;
+    }
+    else
+    {
+        track_out_cnt = 0;                                  /* 只要有一帧不像，就重新计数 */
     }
 
-    // ---- 3. 统计跳变点数量 ----
-    break_cnt = 0;
-    if (top_l >= 0) break_cnt++;
-    if (top_r >= 0) break_cnt++;
-    if (btm_l >= 0) break_cnt++;
-    if (btm_r >= 0) break_cnt++;
+    return track_out_flag;
+}
 
-    // ---- 4. 跳变点 < 3：不是十字路口，释放补线 ----
-    if (break_cnt < 3)
+
+/*============================== 十字补线（最小二乘拟合进入方向） ==============================*/
+/* ★★【调试开关】改成 0 = 整块关掉十字补线 ★★
+   用途：过弯出现“先偏一下 → 瞬间打直 → 冲出去”时，先把它关掉跑同一个弯：
+     现象消失  → 就是十字模块在弯道误触发（下一步修它的判据）
+     现象还在  → 与十字模块无关（去查控制环 / 扫线 / 其它） */
+#define CROSS_FILL_ENABLE   1
+
+#define CROSS_GAP_MIN     4      /* 开口至少 3 行才算十字 */
+#define CROSS_NEAR_OK     5      /* 近端至少 5 行双侧有线 */
+#define CROSS_FIT_MIN     4      /* 拟合至少需要 4 个有效点 */
+#define CROSS_MID_SAFE    25     /* 参考行中线合理范围：25~163，超出说明被交叉赛道边线带偏 */
+#define CROSS_MID_LIMIT   20     /* 中线相对“入口处”最多偏 20 像素（≈6° 舵角，原来 40 太大） */
+
+/* 调试用：打到屏幕上就能看出斜率和偏向 */
+int16 dbg_cross_a100 = 0;   /* 进入方向斜率 ×100 */
+uint8 dbg_cross_m0   = 0;   /* 入口处中线 */
+uint8 dbg_cross_m94  = 0;   /* 控制行(94)的中线 */
+
+uint8 cross_fill_new(uint8 *l_line, uint8 *r_line, uint8 *m_line)
+{
+    int row, near_lost = -1, far_found = -1;
+    int ok = 0, n = 0, t, span, mm;
+    int L0, R0, L1, R1, l, r, m, m_end;
+    float sx = 0, sy = 0, sxx = 0, sxy = 0, den, a = 0.0f, b = 0.0f;
+
+    if (CROSS_FILL_ENABLE == 0) return 0;      /* ★调试开关：整块关掉 */
+
+    /* --- 1) 从车头往远处扫：两侧同时丢线的第一行 = 十字近端断点 --- */
+    for (row = START_ROW; row >= END_ROW; row--)
+        if (!left_find_flag[row] && !right_find_flag[row]) { near_lost = row; break; }
+
+    if (near_lost < 0 || near_lost <= END_ROW + CROSS_GAP_MIN) return 0;   /* 没有开口 → 正常巡线 */
+
+    /* --- 2) 近端有效行：够多 + 顺便做最小二乘拟合 --- */
+    for (row = near_lost + 1; row <= START_ROW; row++)
     {
-        crossed_flag = 0;
+        if (left_find_flag[row] && right_find_flag[row])
+        {
+            mm = ((int)l_line[row] + (int)r_line[row]) / 2;
+
+            /* ★剔除被横向交叉赛道边线带偏的行：中线跑到很边上，就不是本赛道的中线 */
+            if (mm <= CROSS_MID_SAFE || mm >= IMG_W - CROSS_MID_SAFE) continue;
+
+            ok++;
+            sx  += (float)row;
+            sy  += (float)mm;
+            sxx += (float)row * (float)row;
+            sxy += (float)row * (float)mm;
+            n++;
+        }
+    }
+
+    if (ok < CROSS_NEAR_OK || n < CROSS_FIT_MIN)
+    {
+        /* ★数据不够就直接放弃补线，绝对不要动中线！
+           以前这里是把整条中线填成 IMG_CENTER(94) 当“打正”，
+           而 CONTROL_ROW 正好也是 94 —— 于是车头一行丢线，舵机就被精确打正、直冲出去。
+           补线是锦上添花：看不清的时候什么都不做，才是最安全的。 */
         return 0;
     }
 
-    // ---- 5. 防抖：连续两帧检测到才触发 ----
-    if (crossed_flag == 0)
+    /* ★最小二乘拟合 mid = a*row + b：这才是真正的“进入方向”（含透视关系） */
+    den = (float)n * sxx - sx * sx;
+    if (den > 1.0f) { a = ((float)n * sxy - sx * sy) / den;  b = (sy - a * sx) / (float)n; }
+    else            { a = 0.0f;  b = (float)mid_line[near_lost + 1]; }
+
+    dbg_cross_a100 = (int)(a * 100.0f);
+    dbg_cross_m0   = (uint8)(a * (float)(near_lost + 1) + b);
+
+    /* --- 3) 远端有没有重新看到赛道 --- */
+    for (row = near_lost - 1; row >= END_ROW; row--)
+        if (left_find_flag[row] && right_find_flag[row]) { far_found = row; break; }
+
+    if (far_found > 0 && far_found < near_lost)
     {
-        crossed_flag = 1;
-        return 0;
+        /* ===== A. 远端看得到 → 两端线性插值 ===== */
+        L0 = l_line[near_lost + 1];  R0 = r_line[near_lost + 1];
+        L1 = l_line[far_found];      R1 = r_line[far_found];
+        span = (near_lost + 1) - far_found;
+
+        for (row = far_found; row <= near_lost; row++)
+        {
+            t = row - far_found;
+            l = L1 + (L0 - L1) * t / span;
+            r = R1 + (R0 - R1) * t / span;
+            m = (l + r) / 2;
+            if (l < 0) l = 0;  if (l > IMG_W - 1) l = IMG_W - 1;
+            if (r < 0) r = 0;  if (r > IMG_W - 1) r = IMG_W - 1;
+            if (r - l < 10) { l = m - 5; r = m + 5; }        /* 边线交叉保护 */
+
+            l_line[row] = (uint8)l;  r_line[row] = (uint8)r;  m_line[row] = (uint8)m;
+        }
+    }
+    else
+    {
+        /* ===== B. 远端看不到（最常见）→ 沿拟合出来的进入方向外推 ===== */
+        m_end = (int)(a * (float)near_lost + b);             /* 入口行处的拟合值 = 限幅基准 */
+
+        for (row = END_ROW; row <= near_lost; row++)
+        {
+            m = (int)(a * (float)row + b);                   /* 直接用拟合直线，斜率不再被量化 */
+
+            if (m > m_end + CROSS_MID_LIMIT) m = m_end + CROSS_MID_LIMIT;   /* ±20 收紧 */
+            if (m < m_end - CROSS_MID_LIMIT) m = m_end - CROSS_MID_LIMIT;
+            if (m < 0) m = 0;  if (m > IMG_W - 1) m = IMG_W - 1;
+
+            l = m - 20;  r = m + 20;                         /* 示意边线，只为显示 */
+            if (l < 0) l = 0;  if (r > IMG_W - 1) r = IMG_W - 1;
+
+            l_line[row] = (uint8)l;  r_line[row] = (uint8)r;  m_line[row] = (uint8)m;
+        }
     }
 
-    // ---- 6. 取统一的上/下跳变点行（处理只有 3 个跳变点的情况） ----
-    // 上跳变点行：取两个上跳变点中靠下方的（更深入十字区域）
-    top_row = -1;
-    if (top_l >= 0 && top_r >= 0)
-        top_row = (top_l > top_r) ? top_l : top_r;
-    else if (top_l >= 0)
-        top_row = top_l;
-    else if (top_r >= 0)
-        top_row = top_r;
+    dbg_cross_m94 = m_line[CONTROL_ROW];
 
-    // 下跳变点行：取两个下跳变点中靠上方的
-    btm_row = -1;
-    if (btm_l >= 0 && btm_r >= 0)
-        btm_row = (btm_l < btm_r) ? btm_l : btm_r;
-    else if (btm_l >= 0)
-        btm_row = btm_l;
-    else if (btm_r >= 0)
-        btm_row = btm_r;
+    /* --- 4) 补过的行标记为“已找到” --- */
+    for (row = (far_found > 0 ? far_found : END_ROW); row <= near_lost; row++)
+    { left_find_flag[row] = 1; right_find_flag[row] = 1; }
 
-    if (top_row < 0 || btm_row < 0 || top_row >= btm_row) return 0;
-
-    // ---- 7. 线性插值填充十字区域的边线，利用四个拐点计算中线 ----
-    range = btm_row - top_row;
-    for (row = top_row; row <= btm_row; row++)
-    {
-        y_diff = row - top_row;
-        // 左边线：上跳变点 → 下跳变点 线性插值
-        left_line[row] = (uint8)((int)left_line[top_row]
-                          + ((int)left_line[btm_row] - (int)left_line[top_row]) * y_diff / range);
-        // 右边线：上跳变点 → 下跳变点 线性插值
-        right_line[row] = (uint8)((int)right_line[top_row]
-                           + ((int)right_line[btm_row] - (int)right_line[top_row]) * y_diff / range);
-        // 中线：基于四个拐点插值后的左右边线取中点
-        mid_line[row] = (uint8)(((int)left_line[row] + (int)right_line[row]) / 2);
-    }
     return 1;
+}
+
+
+/*============================== 中线滑动平均（去毛刺 / 去接缝台阶） ==============================*/
+/*-------------------------------------------------------------------
+ * 对最终中线做一次 K 点滑动平均：
+ *   1) 去掉逐行跳变造成的毛刺（舵机会被“抽”一下）
+ *   2) 抹平“真实扫描的中线”和“十字补线区的中线”之间的接缝台阶
+ * 注意：必须用 tmp 缓冲，不能原地平均（否则会把数据一路“拖”过去）
+ *------------------------------------------------------------------*/
+static void filter_mid_line(void)
+{
+    uint8 row, k;
+    int16 sum;
+    static uint8 tmp[IMG_H];
+
+    for (row = 0; row < IMG_H; row++) tmp[row] = mid_line[row];
+
+    for (row = END_ROW + MID_HALF; row + MID_HALF <= START_ROW; row++)
+    {
+        sum = 0;
+        for (k = 0; k < MID_FILTER_WIN; k++) sum += (int16)tmp[row - MID_HALF + k];
+        mid_line[row] = (uint8)(sum / MID_FILTER_WIN);
+    }
 }
 
 
@@ -213,8 +358,18 @@ float compute_servo_angle(uint8 *mid_line, uint8 row, uint8 center_col,
 /* 巡线总流程：主循环在 image_update() 之后、image_frame_done() 之前调用 */
 void tracking_task(void)
 {
+    /* ★★出界保护放在最前面：一旦判出界，直接把电机置零，本帧不再巡线、不再打舵 ★★ */
+    if (track_out_check())
+    {
+        motor_enable_set(0);      /* 电机置零  */
+        return;
+    }
+
     scan_lines(image_get_threshold(), left_line, right_line, mid_line, START_ROW, END_ROW);
     cross_flag = cross_fill_new(left_line, right_line, mid_line);
+
+    filter_mid_line();                          /* 滑动平均：去毛刺 + 抹平补线接缝 */
+    dbg_cross_m94 = mid_line[CONTROL_ROW];      /* 调试量取“最终真正送进舵机”的那个值 */
 
     servo_set_angle( compute_servo_angle(mid_line, CONTROL_ROW, IMG_CENTER,
                                          servo_kp, servo_kd,

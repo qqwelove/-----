@@ -1,4 +1,4 @@
-C251 COMPILER V5.60.0,  seekfree_assistant_inface                                          29/09/26  17:14:56  PAGE 1   
+C251 COMPILER V5.60.0,  seekfree_assistant_inface                                          04/10/26  14:31:08  PAGE 1   
 
 
 C251 COMPILER V5.60.0, COMPILATION OF MODULE seekfree_assistant_inface
@@ -66,7 +66,7 @@ stmt  level    source
              -------------
    50          // 函数简介     逐飞助手接收数据函数
    51          // 参数说明     *buff           需要接收的数据地址
-C251 COMPILER V5.60.0,  seekfree_assistant_inface                                          29/09/26  17:14:56  PAGE 2   
+C251 COMPILER V5.60.0,  seekfree_assistant_inface                                          04/10/26  14:31:08  PAGE 2   
 
    52          // 参数说明     length          要接收的数据最大长度
    53          // 返回参数     uint32          接收到的数据长度

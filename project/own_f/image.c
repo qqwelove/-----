@@ -1,4 +1,5 @@
 #include "image.h"
+#include "tracking.h"
 
 /*Í¼Ïñ»º³åÊý×é*/
 static uint8 xdata display_buffer[MT9V03X_H][MT9V03X_W];
@@ -34,7 +35,10 @@ void image_show(void)
     ips200_show_gray_image(0, 0, display_buffer[0],
                            MT9V03X_W, MT9V03X_H,
                            CAMERA_DIS_W, CAMERA_DIS_H,
-                           adapt_threshold(display_buffer[0], MT9V03X_W, MT9V03X_H));
+                           0);
+                            ips200_show_uint8(0,200, track_out_flag);
+                            ips200_show_uint8(60,200, track_out_cnt);  
+                            ips200_show_uint8(100,200, track_out_mean_min);
 #endif
 }
 

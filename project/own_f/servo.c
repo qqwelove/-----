@@ -3,8 +3,8 @@
 
 
 /* ★定义成变量（不是宏），VOFA 才能取地址在线调 */
-float servo_kp = 0.31f;
-float servo_kd = 0.05f;
+float servo_kp = 0.35f;
+float servo_kd = 0.01f;
 
 
 

@@ -1,4 +1,4 @@
-C251 COMPILER V5.60.0,  main                                                               04/10/26  12:51:52  PAGE 1   
+C251 COMPILER V5.60.0,  main                                                               04/10/26  20:45:53  PAGE 1   
 
 
 C251 COMPILER V5.60.0, COMPILATION OF MODULE main
@@ -21,7 +21,7 @@ stmt  level    source
     9          
    10          
    11          /*测试变量区*/
-   12          float speed;/*-300~300*/
+   12          float speed = 50;/*-300~300*/
    13          
    14          
    15          /*
@@ -47,7 +47,7 @@ stmt  level    source
                float vofa_wave_now    = 0.0f;                  // 通道 4 波形通道（换成你要观察的量 例如实际速度）
                
                // 参数指针表 数组下标就是 VOFA+ 里设置的通道号
-               float *vofa_param_table[4] =;
+               float *vofa_param_table[4];
                 {
                    (float *)&speed_kp,
                    (float *)&speed_ki,
@@ -66,7 +66,7 @@ stmt  level    source
              -------------
                void vofa_send_tick (void)
                {
-C251 COMPILER V5.60.0,  main                                                               04/10/26  12:51:52  PAGE 2   
+C251 COMPILER V5.60.0,  main                                                               04/10/26  20:45:53  PAGE 2   
 
                    vofa_send_request = 1;
                }
@@ -134,7 +134,7 @@ stmt  level    source
   115   1      
   116   1          /*已包含encoder_init()*/
   117   1          motor_init();
-C251 COMPILER V5.60.0,  main                                                               04/10/26  12:51:52  PAGE 3   
+C251 COMPILER V5.60.0,  main                                                               04/10/26  20:45:53  PAGE 3   
 
   118   1      
   119   1          while (mt9v03x_init()) 
@@ -170,7 +170,7 @@ stmt  level    source
   147   3                  }
   148   2      
   149   2      
-  150   2              // motor_set_target((int16)speed,(int16)speed);
+  150   2              motor_set_target((int16)speed,(int16)speed);
   151   2      
   152   2      /*vofa调参部分*/
   153   2      #if VOFA_DEMO_ENABLE
@@ -198,12 +198,12 @@ stmt  level    source
 Module Information          Static   Overlayable
 ------------------------------------------------
   code size            =    ------     ------
-  ecode size           =       270     ------
+  ecode size           =       308     ------
   data size            =    ------     ------
   idata size           =    ------     ------
   pdata size           =    ------     ------
   xdata size           =         6     ------
-C251 COMPILER V5.60.0,  main                                                               04/10/26  12:51:52  PAGE 4   
+C251 COMPILER V5.60.0,  main                                                               04/10/26  20:45:53  PAGE 4   
 
   xdata-const size     =    ------     ------
   edata size           =    ------     ------
@@ -214,7 +214,7 @@ Module Information          Static   Overlayable
   far data size        =    ------     ------
   huge data size       =    ------     ------
   const size           =    ------     ------
-  hconst size          =         2     ------
+  hconst size          =        11     ------
 End of Module Information.
 
 

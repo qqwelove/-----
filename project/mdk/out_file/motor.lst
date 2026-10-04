@@ -1,4 +1,4 @@
-C251 COMPILER V5.60.0,  motor                                                              04/10/26  12:51:52  PAGE 1   
+C251 COMPILER V5.60.0,  motor                                                              04/10/26  20:45:54  PAGE 1   
 
 
 C251 COMPILER V5.60.0, COMPILATION OF MODULE motor
@@ -23,126 +23,134 @@ stmt  level    source
    11          
    12          static volatile int16  target_l = 0, target_r = 0;
    13          
-   14          /*编码器初始化*/
-   15          void encoder_init(void)
-   16          {
-   17   1        encoder_dir_init(PWMC_ENCODER, PWMC_ENCODER_CH1P_P40, PWMC_ENCODER_CH2P_P42);
-   18   1          encoder_dir_init(PWMA_ENCODER, PWMA_ENCODER_CH1P_P60, PWMA_ENCODER_CH2P_P62); 
-   19   1      }
-   20          
-   21          /*获取编码器(速度)值*/
-   22          void encoder_update(void)
-   23          {
-   24   1        speed_l = encoder_get_count(PWMC_ENCODER);
-   25   1        speed_r = -encoder_get_count(PWMA_ENCODER);
-   26   1      
-   27   1        encoder_clear_count(PWMC_ENCODER);
-   28   1        encoder_clear_count(PWMA_ENCODER);
-   29   1      }
-   30          
-   31          /*结构体成员初始化*/
-   32          void motor_param_init(void)
-   33          {
-   34   1          Left_SpeedPidStructure.outmax = 8000;
-   35   1          Left_SpeedPidStructure.outmin = -8000;
-   36   1      
-   37   1          Right_SpeedPidStructure.outmax = 8000;
-   38   1          Right_SpeedPidStructure.outmin = -8000;
-   39   1      }
-   40          
-   41          /*电机初始化*/
-   42          void motor_init(void) 
-   43          {
-   44   1          encoder_init();
-   45   1          motor_param_init();
-   46   1      
-   47   1          gpio_init(DIR_1, GPO, GPIO_HIGH, GPO_PUSH_PULL);
-   48   1          gpio_init(DIR_2, GPO, GPIO_HIGH, GPO_PUSH_PULL);
-   49   1          pwm_init(PWM_1, 17000, 0);//17khz
-   50   1          pwm_init(PWM_2, 17000, 0);
-   51   1      }
-   52          
-   53          /*电机速度控制*/
-   54          void motor_set_target(int16 speedl,int16 speedr)
-   55          {
-   56   1          target_l = speedl;
-C251 COMPILER V5.60.0,  motor                                                              04/10/26  12:51:52  PAGE 2   
+   14          static uint8 motor_enable = 1;                    /* ★总开关 */
+   15          
+   16          /*编码器初始化*/
+   17          void encoder_init(void)
+   18          {
+   19   1        encoder_dir_init(PWMC_ENCODER, PWMC_ENCODER_CH1P_P40, PWMC_ENCODER_CH2P_P42);
+   20   1          encoder_dir_init(PWMA_ENCODER, PWMA_ENCODER_CH1P_P60, PWMA_ENCODER_CH2P_P62); 
+   21   1      }
+   22          
+   23          /*获取编码器(速度)值*/
+   24          void encoder_update(void)
+   25          {
+   26   1        speed_l = encoder_get_count(PWMC_ENCODER);
+   27   1        speed_r = -encoder_get_count(PWMA_ENCODER);
+   28   1      
+   29   1        encoder_clear_count(PWMC_ENCODER);
+   30   1        encoder_clear_count(PWMA_ENCODER);
+   31   1      }
+   32          
+   33          /*结构体成员初始化*/
+   34          void motor_param_init(void)
+   35          {
+   36   1          Left_SpeedPidStructure.outmax = 8000;
+   37   1          Left_SpeedPidStructure.outmin = -8000;
+   38   1      
+   39   1          Right_SpeedPidStructure.outmax = 8000;
+   40   1          Right_SpeedPidStructure.outmin = -8000;
+   41   1      }
+   42          
+   43          
+   44          
+   45          /*电机初始化*/
+   46          void motor_init(void) 
+   47          {
+   48   1          encoder_init();
+   49   1          motor_param_init();
+   50   1      
+   51   1          gpio_init(DIR_1, GPO, GPIO_HIGH, GPO_PUSH_PULL);
+   52   1          gpio_init(DIR_2, GPO, GPIO_HIGH, GPO_PUSH_PULL);
+   53   1          pwm_init(PWM_1, 17000, 0);//17khz
+   54   1          pwm_init(PWM_2, 17000, 0);
+   55   1      }
+   56          
+C251 COMPILER V5.60.0,  motor                                                              04/10/26  20:45:54  PAGE 2   
 
-   57   1          target_r = speedr;
-   58   1      }
-   59          
-   60          /*电机停转*/
-   61          void motor_stop(void)
-   62          {
-   63   1          motor_set_target(0,0);
-   64   1      }
-   65          
+   57          void motor_enable_set(uint8 en) { motor_enable = en ? 1 : 0; }
+   58          
+   59          /*电机速度控制*/
+   60          void motor_set_target(int16 speedl,int16 speedr)
+   61          {
+   62   1          if (!motor_enable) { speedl = 0; speedr = 0; }  /* 守门 */
+   63   1          target_l = speedl;
+   64   1          target_r = speedr;
+   65   1      }
    66          
-   67          /*定时器定时控制pid函数 10ms*/
-   68          void motor_speed_control(void)
+   67          /*电机停转*/
+   68          void motor_stop(void)
    69          {
-   70   1          encoder_update();
-   71   1          Left_SpeedPidStructure.target  = target_l;
-   72   1          Right_SpeedPidStructure.target = target_r;
-   73   1          Left_SpeedPidStructure.actual = speed_l;
-   74   1          Right_SpeedPidStructure.actual = speed_r;
-   75   1          Left_SpeedPidStructure.kp = speed_kp;
-   76   1          Right_SpeedPidStructure.kp = speed_kp;
-   77   1          Left_SpeedPidStructure.ki = speed_ki;
-   78   1          Right_SpeedPidStructure.ki = speed_ki;
-   79   1          
-   80   1      
-   81   1      
-   82   1          PID_Update(&Left_SpeedPidStructure);
-   83   1          PID_Update(&Right_SpeedPidStructure);
-   84   1      
-   85   1          if(Left_SpeedPidStructure.out >= 0)
-   86   1          {
-   87   2              gpio_set_level(DIR_2, !0);//对于左电机,1是正转
-   88   2              Left_PWM = (uint16)Left_SpeedPidStructure.out;
-   89   2          }
-   90   1          else
-   91   1          {
-   92   2              gpio_set_level(DIR_2, 0);//对于左电机,1是正转
-   93   2              Left_PWM = (uint16)(-Left_SpeedPidStructure.out);
-   94   2          }
-   95   1          if(Right_SpeedPidStructure.out >= 0)
-   96   1          {
-   97   2              gpio_set_level(DIR_1, 0);//对于左电机,1是正转
-   98   2              Right_PWM = (uint16)Right_SpeedPidStructure.out;
-   99   2          }
-  100   1          else
-  101   1          {
-  102   2              gpio_set_level(DIR_1, !0);//对于左电机,1是正转
-  103   2              Right_PWM = (uint16)(-Right_SpeedPidStructure.out);
-  104   2          }
-  105   1      
-  106   1          pwm_set_duty(PWM_2,Left_PWM);
-  107   1          pwm_set_duty(PWM_1,Right_PWM);
-  108   1      }
-  109          
+   70   1          motor_enable = 0;  /* ★锁死：之后谁写 target 都没用了 */
+   71   1          motor_set_target(0,0);
+   72   1      }
+   73          
+   74          
+   75          /*定时器定时控制pid函数 10ms*/
+   76          void motor_speed_control(void)
+   77          {
+   78   1          encoder_update();
+   79   1          Left_SpeedPidStructure.target  = target_l;
+   80   1          Right_SpeedPidStructure.target = target_r;
+   81   1          Left_SpeedPidStructure.actual = speed_l;
+   82   1          Right_SpeedPidStructure.actual = speed_r;
+   83   1          Left_SpeedPidStructure.kp = speed_kp;
+   84   1          Right_SpeedPidStructure.kp = speed_kp;
+   85   1          Left_SpeedPidStructure.ki = speed_ki;
+   86   1          Right_SpeedPidStructure.ki = speed_ki;
+   87   1          
+   88   1      
+   89   1      
+   90   1          PID_Update(&Left_SpeedPidStructure);
+   91   1          PID_Update(&Right_SpeedPidStructure);
+   92   1      
+   93   1          if(Left_SpeedPidStructure.out >= 0)
+   94   1          {
+   95   2              gpio_set_level(DIR_2, !0);//对于左电机,1是正转
+   96   2              Left_PWM = (uint16)Left_SpeedPidStructure.out;
+   97   2          }
+   98   1          else
+   99   1          {
+  100   2              gpio_set_level(DIR_2, 0);//对于左电机,1是正转
+  101   2              Left_PWM = (uint16)(-Left_SpeedPidStructure.out);
+  102   2          }
+  103   1          if(Right_SpeedPidStructure.out >= 0)
+  104   1          {
+  105   2              gpio_set_level(DIR_1, 0);//对于左电机,1是正转
+  106   2              Right_PWM = (uint16)Right_SpeedPidStructure.out;
+  107   2          }
+  108   1          else
+  109   1          {
+  110   2              gpio_set_level(DIR_1, !0);//对于左电机,1是正转
+  111   2              Right_PWM = (uint16)(-Right_SpeedPidStructure.out);
+  112   2          }
+  113   1      
+  114   1          pwm_set_duty(PWM_2,Left_PWM);
+  115   1          pwm_set_duty(PWM_1,Right_PWM);
+  116   1      }
+  117          
 
 
 Module Information          Static   Overlayable
 ------------------------------------------------
   code size            =    ------     ------
-  ecode size           =       677     ------
+  ecode size           =       730     ------
+C251 COMPILER V5.60.0,  motor                                                              04/10/26  20:45:54  PAGE 3   
+
   data size            =    ------     ------
   idata size           =    ------     ------
   pdata size           =    ------     ------
-  xdata size           =       128     ------
+  xdata size           =       130     ------
   xdata-const size     =    ------     ------
   edata size           =    ------     ------
   bit size             =    ------     ------
   ebit size            =    ------     ------
-C251 COMPILER V5.60.0,  motor                                                              04/10/26  12:51:52  PAGE 3   
-
   bitaddressable size  =    ------     ------
   ebitaddressable size =    ------     ------
   far data size        =    ------     ------
   huge data size       =    ------     ------
   const size           =    ------     ------
-  hconst size          =        46     ------
+  hconst size          =        52     ------
 End of Module Information.
 
 

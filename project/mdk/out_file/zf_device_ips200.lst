@@ -1,4 +1,4 @@
-C251 COMPILER V5.60.0,  zf_device_ips200                                                   29/09/26  17:14:53  PAGE 1   
+C251 COMPILER V5.60.0,  zf_device_ips200                                                   04/10/26  14:31:04  PAGE 1   
 
 
 C251 COMPILER V5.60.0, COMPILATION OF MODULE zf_device_ips200
@@ -66,7 +66,7 @@ stmt  level    source
    50          
    51          #include "zf_common_clock.h"
    52          #include "zf_common_debug.h"
-C251 COMPILER V5.60.0,  zf_device_ips200                                                   29/09/26  17:14:53  PAGE 2   
+C251 COMPILER V5.60.0,  zf_device_ips200                                                   04/10/26  14:31:04  PAGE 2   
 
    53          #include "zf_common_font.h"
    54          #include "zf_common_function.h"
@@ -134,7 +134,7 @@ stmt  level    source
   112   1      
   113   1        ips200_write_index(0x2a);                                               // 列地址设置
   114   1        ips200_write_16bit_data(x1);
-C251 COMPILER V5.60.0,  zf_device_ips200                                                   29/09/26  17:14:53  PAGE 3   
+C251 COMPILER V5.60.0,  zf_device_ips200                                                   04/10/26  14:31:04  PAGE 3   
 
   115   1        ips200_write_16bit_data(x2);
   116   1        ips200_write_index(0x2b);                                               // 行地址设置
@@ -202,7 +202,7 @@ stmt  level    source
   174          //-------------------------------------------------------------------------------------------------------
              -------------
   175          // 函数简介       设置显示颜色
-C251 COMPILER V5.60.0,  zf_device_ips200                                                   29/09/26  17:14:53  PAGE 4   
+C251 COMPILER V5.60.0,  zf_device_ips200                                                   04/10/26  14:31:04  PAGE 4   
 
   176          // 参数说明       pen             颜色格式 RGB565 或者可以使用 zf_common_font.h 内常用颜色宏定义
   177          // 参数说明       bgcolor         颜色格式 RGB565 或者可以使用 zf_common_font.h 内常用颜色宏定义
@@ -270,7 +270,7 @@ stmt  level    source
   233   1      }
   234          
   235          //-------------------------------------------------------------------------------------------------------
-C251 COMPILER V5.60.0,  zf_device_ips200                                                   29/09/26  17:14:53  PAGE 5   
+C251 COMPILER V5.60.0,  zf_device_ips200                                                   04/10/26  14:31:04  PAGE 5   
 
              -------------
   236          // 函数简介       液晶显示字符串
@@ -338,7 +338,7 @@ stmt  level    source
              -------------
   294          // 函数简介       液晶显示8位无符号
   295          // 参数说明       x               坐标x方向的起点 参数范围 [0, ips200_x_max-1]
-C251 COMPILER V5.60.0,  zf_device_ips200                                                   29/09/26  17:14:53  PAGE 6   
+C251 COMPILER V5.60.0,  zf_device_ips200                                                   04/10/26  14:31:04  PAGE 6   
 
   296          // 参数说明       y               坐标y方向的起点 参数范围 [0, ips200_y_max-1]
   297          // 参数说明       dat             需要显示的变量 数据类型uint8
@@ -406,7 +406,7 @@ stmt  level    source
   356   2          }
   357   1      }
   358          
-C251 COMPILER V5.60.0,  zf_device_ips200                                                   29/09/26  17:14:53  PAGE 7   
+C251 COMPILER V5.60.0,  zf_device_ips200                                                   04/10/26  14:31:04  PAGE 7   
 
   359          //-------------------------------------------------------------------------------------------------------
              -------------
@@ -474,7 +474,7 @@ stmt  level    source
   417   1          while(length < num)
   418   1          {
   419   2              buff[length] = ' ';
-C251 COMPILER V5.60.0,  zf_device_ips200                                                   29/09/26  17:14:53  PAGE 8   
+C251 COMPILER V5.60.0,  zf_device_ips200                                                   04/10/26  14:31:04  PAGE 8   
 
   420   2              length++;
   421   2          }
@@ -542,7 +542,7 @@ stmt  level    source
              -------------
   479          // 函数简介       IPS200 显示波形
   480          // 参数说明       x               坐标x方向的起点 参数范围 [0, ips200_x_max-1]
-C251 COMPILER V5.60.0,  zf_device_ips200                                                   29/09/26  17:14:53  PAGE 9   
+C251 COMPILER V5.60.0,  zf_device_ips200                                                   04/10/26  14:31:04  PAGE 9   
 
   481          // 参数说明       y               坐标y方向的起点 参数范围 [0, ips200_y_max-1]
   482          // 参数说明       *p              波形数组指针
@@ -610,7 +610,7 @@ stmt  level    source
   538   1          ips200_set_region(x,y,number*siz-1+x,y+siz-1);
   539   1          
   540   1          for(i=0;i<siz;i++)
-C251 COMPILER V5.60.0,  zf_device_ips200                                                   29/09/26  17:14:53  PAGE 10  
+C251 COMPILER V5.60.0,  zf_device_ips200                                                   04/10/26  14:31:04  PAGE 10  
 
   541   1          {
   542   2              temp1 = number;
@@ -678,7 +678,7 @@ stmt  level    source
   599   2              for(i = 0; i < dis_width; i ++)
   600   2              {
   601   3                  temp = *(image_temp + i * width / dis_width);                       // 读取像素点
-C251 COMPILER V5.60.0,  zf_device_ips200                                                   29/09/26  17:14:53  PAGE 11  
+C251 COMPILER V5.60.0,  zf_device_ips200                                                   04/10/26  14:31:04  PAGE 11  
 
   602   3                  if(threshold == 0)
   603   3                  {
@@ -746,7 +746,7 @@ stmt  level    source
   661   1      
   662   1          ips200_write_index(0xB2);
   663   1          ips200_write_8bit_data(0x0C);
-C251 COMPILER V5.60.0,  zf_device_ips200                                                   29/09/26  17:14:53  PAGE 12  
+C251 COMPILER V5.60.0,  zf_device_ips200                                                   04/10/26  14:31:04  PAGE 12  
 
   664   1          ips200_write_8bit_data(0x0C);
   665   1          ips200_write_8bit_data(0x00);
@@ -814,7 +814,7 @@ stmt  level    source
   727   1      
   728   1      /*自己加的
   729   1          #if (IPS200_DISPLAY_INVERT)
-C251 COMPILER V5.60.0,  zf_device_ips200                                                   29/09/26  17:14:53  PAGE 13  
+C251 COMPILER V5.60.0,  zf_device_ips200                                                   04/10/26  14:31:04  PAGE 13  
 
   730   1          ips200_write_index(0x21);       // 反显开，适用于需要反显的面板
   731   1          #else

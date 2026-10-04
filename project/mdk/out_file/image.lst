@@ -1,4 +1,4 @@
-C251 COMPILER V5.60.0,  image                                                              04/10/26  13:49:07  PAGE 1   
+C251 COMPILER V5.60.0,  image                                                              04/10/26  21:19:05  PAGE 1   
 
 
 C251 COMPILER V5.60.0, COMPILATION OF MODULE image
@@ -11,132 +11,136 @@ COMPILER INVOKED BY: D:\keil c251\C251\BIN\C251.EXE ..\own_f\image.c LARGE FLOAT
 stmt  level    source
 
     1          #include "image.h"
-    2          
-    3          /*图像缓冲数组*/
-    4          static uint8 xdata display_buffer[MT9V03X_H][MT9V03X_W];
-    5          
-    6          static uint8 image_threshold = 0;
-    7          static uint16 frame_cnt = 0, image_fps = 0;
-    8          
-    9          static uint8 adapt_threshold(uint8 xdata *image, uint16 col, uint16 row);
-   10          
+    2          #include "tracking.h"
+    3          
+    4          /*图像缓冲数组*/
+    5          static uint8 xdata display_buffer[MT9V03X_H][MT9V03X_W];
+    6          
+    7          static uint8 image_threshold = 0;
+    8          static uint16 frame_cnt = 0, image_fps = 0;
+    9          
+   10          static uint8 adapt_threshold(uint8 xdata *image, uint16 col, uint16 row);
    11          
-   12          void image_frame_done(void)
-   13          {
-   14   1          mt9v03x_finish_flag = 0;        /* 全部处理完才放行下一帧 */
-   15   1      }
-   16          
+   12          
+   13          void image_frame_done(void)
+   14          {
+   15   1          mt9v03x_finish_flag = 0;        /* 全部处理完才放行下一帧 */
+   16   1      }
    17          
-   18          //有新帧并已存好快照返回 1，处理完必须调 image_frame_done()
-   19          uint8 image_update(void)
-   20          {
-   21   1          if(!mt9v03x_finish_flag) return 0;          /* 没有新帧就直接返回，main 不用管标志位 */
-   22   1      
-   23   1          image_threshold = adapt_threshold((uint8 xdata *)mt9v03x_image, MT9V03X_W, MT9V03X_H);
-   24   1          memcpy(display_buffer, mt9v03x_image, sizeof(display_buffer));
-   25   1          
-   26   1      
-   27   1          return 1;
-   28   1      }
-   29          
+   18          
+   19          //有新帧并已存好快照返回 1，处理完必须调 image_frame_done()
+   20          uint8 image_update(void)
+   21          {
+   22   1          if(!mt9v03x_finish_flag) return 0;          /* 没有新帧就直接返回，main 不用管标志位 */
+   23   1      
+   24   1          image_threshold = adapt_threshold((uint8 xdata *)mt9v03x_image, MT9V03X_W, MT9V03X_H);
+   25   1          memcpy(display_buffer, mt9v03x_image, sizeof(display_buffer));
+   26   1          
+   27   1      
+   28   1          return 1;
+   29   1      }
    30          
-   31          void image_show(void)
-   32          {
-   33   1      #if IMG_SHOW_ENABLE
-   34   1          ips200_show_gray_image(0, 0, display_buffer[0],
-   35   1                                 MT9V03X_W, MT9V03X_H,
-   36   1                                 CAMERA_DIS_W, CAMERA_DIS_H,
-   37   1                                 adapt_threshold(display_buffer[0], MT9V03X_W, MT9V03X_H));
-   38   1      #endif
-   39   1      }
-   40          
-   41          
-   42          uint8 image_get_threshold(void) { return image_threshold; }
-   43          
+   31          
+   32          void image_show(void)
+   33          {
+   34   1      #if IMG_SHOW_ENABLE
+   35   1          ips200_show_gray_image(0, 0, display_buffer[0],
+   36   1                                 MT9V03X_W, MT9V03X_H,
+   37   1                                 CAMERA_DIS_W, CAMERA_DIS_H,
+   38   1                                 0);
+   39   1                                  ips200_show_uint8(0,200, track_out_flag);
+   40   1                                  ips200_show_uint8(60,200, track_out_cnt);  
+   41   1                                  ips200_show_uint8(100,200, track_out_mean_min);
+   42   1      #endif
+   43   1      }
    44          
-   45          void image_draw_point(uint16 row, uint16 col, uint8 gray)
-   46          {
-   47   1          if(row < MT9V03X_H && col < MT9V03X_W) display_buffer[row][col] = gray;
-   48   1      }
-   49          
-   50          
-   51          static uint8 adapt_threshold(uint8 xdata *image, uint16 col, uint16 row)
-   52          {
-   53   1          int   pixelCount[256];
-   54   1          float pixelPro[256];
-   55   1          uint16 i, j;
-   56   1          uint32 gray_sum = 0, sample_num = 0;
-C251 COMPILER V5.60.0,  image                                                              04/10/26  13:49:07  PAGE 2   
+   45          
+   46          uint8 image_get_threshold(void) { return image_threshold; }
+   47          
+   48          
+   49          void image_draw_point(uint16 row, uint16 col, uint8 gray)
+   50          {
+   51   1          if(row < MT9V03X_H && col < MT9V03X_W) display_buffer[row][col] = gray;
+   52   1      }
+   53          
+   54          
+   55          static uint8 adapt_threshold(uint8 xdata *image, uint16 col, uint16 row)
+   56          {
+C251 COMPILER V5.60.0,  image                                                              04/10/26  21:19:05  PAGE 2   
 
-   57   1          float  w0 = 0, w1, u0tmp = 0, u1tmp, u0, u1, u, deltaTmp, deltaMax = 0;
-   58   1          uint8  threshold;
-   59   1          static uint8 last_th = 120;                     /* 帧间限速用 */
-   60   1      
-   61   1          for (i = 0; i < 256; i++) pixelCount[i] = 0;
-   62   1      
-   63   1          /* ★1. 采样整幅图（不要只取远处），步长 3 → 约 1/9 像素 */
-   64   1          for (i = 4; i < row - 4; i += 3)
-   65   1          {
-   66   2              for (j = 0; j < col; j += 3)
-   67   2              {
-   68   3                  pixelCount[(int)image[i * col + j]]++;
-   69   3                  gray_sum   += (uint32)image[i * col + j];
-   70   3                  sample_num++;
-   71   3              }
-   72   2          }
-   73   1          if (sample_num == 0) return last_th;
-   74   1      
-   75   1          for (i = 0; i < 256; i++) pixelPro[i] = (float)pixelCount[i] / (float)sample_num;
-   76   1      
-   77   1          /* ★2. 全图均值只算一次，别再 gray_sum/pixelSum 混搭 */
-   78   1          u = (float)gray_sum / (float)sample_num;
-   79   1      
-   80   1          /* ★3. 扫完 256 个 bin，取全局最大；去掉提前 break */
-   81   1          for (j = 0; j < 256; j++)
-   82   1          {
-   83   2              w0    += pixelPro[j];
-   84   2              u0tmp += (float)j * pixelPro[j];
-   85   2              w1     = 1.0f - w0;
-   86   2              u1tmp  = u - u0tmp;
-   87   2      
-   88   2              if (w0 < 0.0001f || w1 < 0.0001f) continue;          /* ★除零保护 */
-   89   2      
-   90   2              u0 = u0tmp / w0;
-   91   2              u1 = u1tmp / w1;
-   92   2      
-   93   2              deltaTmp = w0 * (u0 - u) * (u0 - u)                  /* ★不用 pow（double 太慢） */
-   94   2                       + w1 * (u1 - u) * (u1 - u);
-   95   2      
-   96   2              if (deltaTmp > deltaMax)
-   97   2              {
-   98   3                  deltaMax  = deltaTmp;
-   99   3                  threshold = (uint8)j;
-  100   3              }
-  101   2          }
-  102   1      
-  103   1          /* ★4. 限幅：先按你正常直道时的阈值（大概 110~140）来定这个区间 */
-  104   1          if (threshold < 60)  threshold = 60;
-  105   1          if (threshold > 200) threshold = 200;
+   57   1          int   pixelCount[256];
+   58   1          float pixelPro[256];
+   59   1          uint16 i, j;
+   60   1          uint32 gray_sum = 0, sample_num = 0;
+   61   1          float  w0 = 0, w1, u0tmp = 0, u1tmp, u0, u1, u, deltaTmp, deltaMax = 0;
+   62   1          uint8  threshold;
+   63   1          static uint8 last_th = 120;                     /* 帧间限速用 */
+   64   1      
+   65   1          for (i = 0; i < 256; i++) pixelCount[i] = 0;
+   66   1      
+   67   1          /* ★1. 采样整幅图（不要只取远处），步长 3 → 约 1/9 像素 */
+   68   1          for (i = 4; i < row - 4; i += 3)
+   69   1          {
+   70   2              for (j = 0; j < col; j += 3)
+   71   2              {
+   72   3                  pixelCount[(int)image[i * col + j]]++;
+   73   3                  gray_sum   += (uint32)image[i * col + j];
+   74   3                  sample_num++;
+   75   3              }
+   76   2          }
+   77   1          if (sample_num == 0) return last_th;
+   78   1      
+   79   1          for (i = 0; i < 256; i++) pixelPro[i] = (float)pixelCount[i] / (float)sample_num;
+   80   1      
+   81   1          /* ★2. 全图均值只算一次，别再 gray_sum/pixelSum 混搭 */
+   82   1          u = (float)gray_sum / (float)sample_num;
+   83   1      
+   84   1          /* ★3. 扫完 256 个 bin，取全局最大；去掉提前 break */
+   85   1          for (j = 0; j < 256; j++)
+   86   1          {
+   87   2              w0    += pixelPro[j];
+   88   2              u0tmp += (float)j * pixelPro[j];
+   89   2              w1     = 1.0f - w0;
+   90   2              u1tmp  = u - u0tmp;
+   91   2      
+   92   2              if (w0 < 0.0001f || w1 < 0.0001f) continue;          /* ★除零保护 */
+   93   2      
+   94   2              u0 = u0tmp / w0;
+   95   2              u1 = u1tmp / w1;
+   96   2      
+   97   2              deltaTmp = w0 * (u0 - u) * (u0 - u)                  /* ★不用 pow（double 太慢） */
+   98   2                       + w1 * (u1 - u) * (u1 - u);
+   99   2      
+  100   2              if (deltaTmp > deltaMax)
+  101   2              {
+  102   3                  deltaMax  = deltaTmp;
+  103   3                  threshold = (uint8)j;
+  104   3              }
+  105   2          }
   106   1      
-  107   1          /* ★5. 帧间限速：单帧最多变化 ±25，彻底堵住"突然全白" */
-  108   1          if (threshold > last_th + 25) threshold = last_th + 25;
-  109   1          if (threshold < last_th - 25) threshold = last_th - 25;
-  110   1          last_th = threshold;
-  111   1      
-  112   1          return threshold;
-  113   1      }
+  107   1          /* ★4. 限幅：先按你正常直道时的阈值（大概 110~140）来定这个区间 */
+  108   1          if (threshold < 60)  threshold = 60;
+  109   1          if (threshold > 200) threshold = 200;
+  110   1      
+  111   1          /* ★5. 帧间限速：单帧最多变化 ±25，彻底堵住"突然全白" */
+  112   1          if (threshold > last_th + 25) threshold = last_th + 25;
+  113   1          if (threshold < last_th - 25) threshold = last_th - 25;
+  114   1          last_th = threshold;
+  115   1      
+  116   1          return threshold;
+  117   1      }
 
 
 Module Information          Static   Overlayable
 ------------------------------------------------
   code size            =    ------     ------
-  ecode size           =      1507     ------
+  ecode size           =      1539     ------
+C251 COMPILER V5.60.0,  image                                                              04/10/26  21:19:05  PAGE 3   
+
   data size            =    ------     ------
   idata size           =    ------     ------
   pdata size           =    ------     ------
   xdata size           =     24162     ------
-C251 COMPILER V5.60.0,  image                                                              04/10/26  13:49:07  PAGE 3   
-
   xdata-const size     =    ------     ------
   edata size           =    ------     ------
   bit size             =    ------     ------

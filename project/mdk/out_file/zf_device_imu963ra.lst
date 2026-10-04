@@ -1,4 +1,4 @@
-C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 29/09/26  17:14:54  PAGE 1   
+C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 04/10/26  14:31:05  PAGE 1   
 
 
 C251 COMPILER V5.60.0, COMPILATION OF MODULE zf_device_imu963ra
@@ -66,7 +66,7 @@ stmt  level    source
    51          *                   VCC                 3.3V电源
    52          *                   GND                 电源地
    53          *                   其余引脚悬空
-C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 29/09/26  17:14:54  PAGE 2   
+C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 04/10/26  14:31:05  PAGE 2   
 
    54          *                   ------------------------------------
    55          *********************************************************************************************************
@@ -134,7 +134,7 @@ stmt  level    source
   111            // 参数说明     len             数据长度
   112            // 返回参数     void
   113            // 使用示例     imu963ra_read_acc_gyro_registers(IMU963RA_OUTX_L_A, dat, 6);
-C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 29/09/26  17:14:54  PAGE 3   
+C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 04/10/26  14:31:05  PAGE 3   
 
   114            // 备注信息     内部调用
   115            //------------------------------------------------------------------------------------------------------
@@ -202,7 +202,7 @@ stmt  level    source
                  //  @param      cmd         命令字
                  //  @param      *val        存储读取的数据地址
                  //  @since      v1.0
-C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 29/09/26  17:14:54  PAGE 4   
+C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 04/10/26  14:31:05  PAGE 4   
 
                  //  Sample usage:
                  //------------------------------------------------------------------------------------------------------
@@ -270,7 +270,7 @@ stmt  level    source
                    IMU963RA_CS(1);
                    return dat;
                  }
-C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 29/09/26  17:14:54  PAGE 5   
+C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 04/10/26  14:31:05  PAGE 5   
 
                
                  //------------------------------------------------------------------------------------------------------
@@ -338,7 +338,7 @@ stmt  level    source
              -------------
   285          // 函数简介     IMU963RA 作为 IIC 主机向磁力计写数据
   286          // 参数说明     addr            目标地址
-C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 29/09/26  17:14:54  PAGE 6   
+C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 04/10/26  14:31:05  PAGE 6   
 
   287          // 参数说明     reg             目标寄存器
   288          // 参数说明     dat            数据
@@ -406,7 +406,7 @@ stmt  level    source
   343   3                  break;
   344   3              }
   345   2              
-C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 29/09/26  17:14:54  PAGE 7   
+C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 04/10/26  14:31:05  PAGE 7   
 
   346   2              system_delay_ms(2);
   347   2          }
@@ -474,7 +474,7 @@ stmt  level    source
   402          // 参数说明     void
   403          // 返回参数     uint8           1-自检失败 0-自检成功
   404          // 使用示例     imu963ra_mag_self_check();
-C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 29/09/26  17:14:54  PAGE 8   
+C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 04/10/26  14:31:05  PAGE 8   
 
   405          // 备注信息     内部调用
   406          //-------------------------------------------------------------------------------------------------------
@@ -542,7 +542,7 @@ stmt  level    source
   463          
   464          //-------------------------------------------------------------------------------------------------------
              -------------
-C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 29/09/26  17:14:54  PAGE 9   
+C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 04/10/26  14:31:05  PAGE 9   
 
   465          // 函数简介     获取 IMU963RA 磁力计数据
   466          // 参数说明     void
@@ -610,7 +610,7 @@ stmt  level    source
   522   2              system_delay_ms(2);
   523   2              imu963ra_write_acc_gyro_register(IMU963RA_FUNC_CFG_ACCESS, 0x00);       // 关闭HUB寄存器访问
   524   2              
-C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 29/09/26  17:14:54  PAGE 10  
+C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 04/10/26  14:31:05  PAGE 10  
 
   525   2              if(imu963ra_acc_gyro_self_check())
   526   2              {
@@ -678,7 +678,7 @@ stmt  level    source
   583   2              // 设置为 0x52 陀螺仪量程为 ±125  dps    获取到的陀螺仪数据除以 228.6   可以转化为带物理单位的数
              -据 单位为 °/s
   584   2              // 设置为 0x50 陀螺仪量程为 ±250  dps    获取到的陀螺仪数据除以 114.3   可以转化为带物理单位的数
-C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 29/09/26  17:14:54  PAGE 11  
+C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 04/10/26  14:31:05  PAGE 11  
 
              -据 单位为 °/s
   585   2              // 设置为 0x54 陀螺仪量程为 ±500  dps    获取到的陀螺仪数据除以 57.1    可以转化为带物理单位的数
@@ -746,7 +746,7 @@ stmt  level    source
   643   3                  break;
   644   3              }
   645   2              
-C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 29/09/26  17:14:54  PAGE 12  
+C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 04/10/26  14:31:05  PAGE 12  
 
   646   2              imu963ra_write_acc_gyro_register(IMU963RA_CTRL3_C, 0x44);               // 使能陀螺仪数字低通滤波
              -器
@@ -814,7 +814,7 @@ stmt  level    source
   702   2              
   703   2              imu963ra_write_mag_register(IMU963RA_MAG_ADDR, IMU963RA_MAG_FBR, 0x01);
   704   2              imu963ra_connect_mag(IMU963RA_MAG_ADDR, IMU963RA_MAG_OUTX_L);
-C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 29/09/26  17:14:54  PAGE 13  
+C251 COMPILER V5.60.0,  zf_device_imu963ra                                                 04/10/26  14:31:05  PAGE 13  
 
   705   2              
   706   2              imu963ra_write_acc_gyro_register(IMU963RA_FUNC_CFG_ACCESS, 0x00);       // 关闭HUB寄存器访问

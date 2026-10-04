@@ -9,7 +9,7 @@
 
 
 /*测试变量区*/
-float speed;/*-300~300*/
+float speed = 50;/*-300~300*/
 
 
 /*
@@ -33,7 +33,7 @@ float vofa_wave_target = 0.0f;                  // 通道 3 波形通道（换成你要观察
 float vofa_wave_now    = 0.0f;                  // 通道 4 波形通道（换成你要观察的量 例如实际速度）
 
 // 参数指针表 数组下标就是 VOFA+ 里设置的通道号
-float *vofa_param_table[4] =;
+float *vofa_param_table[4];
  {
     (float *)&speed_kp,
     (float *)&speed_ki,
@@ -147,7 +147,7 @@ void main(void)
             }
 
 
-        // motor_set_target((int16)speed,(int16)speed);
+        motor_set_target((int16)speed,(int16)speed);
 
 /*vofa调参部分*/
 #if VOFA_DEMO_ENABLE

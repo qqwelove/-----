@@ -1,4 +1,4 @@
-C251 COMPILER V5.60.0,  seekfree_assistant                                                 29/09/26  17:14:56  PAGE 1   
+C251 COMPILER V5.60.0,  seekfree_assistant                                                 04/10/26  14:31:07  PAGE 1   
 
 
 C251 COMPILER V5.60.0, COMPILATION OF MODULE seekfree_assistant
@@ -66,7 +66,7 @@ stmt  level    source
              - 保存接收到的参数
    48          vuint8          seekfree_assistant_parameter_update_flag[SEEKFREE_ASSISTANT_SET_PARAMETR_COUNT] = {0};
    49          //-------------------------------------------------------------------------------------------------------
-C251 COMPILER V5.60.0,  seekfree_assistant                                                 29/09/26  17:14:56  PAGE 2   
+C251 COMPILER V5.60.0,  seekfree_assistant                                                 04/10/26  14:31:07  PAGE 2   
 
              -------------
    50          // 函数简介     逐飞助手求和函数
@@ -134,7 +134,7 @@ stmt  level    source
   104   3              }break;
   105   2      
   106   2              case SEEKFREE_ASSISTANT_SCC8660:
-C251 COMPILER V5.60.0,  seekfree_assistant                                                 29/09/26  17:14:56  PAGE 3   
+C251 COMPILER V5.60.0,  seekfree_assistant                                                 04/10/26  14:31:07  PAGE 3   
 
   107   2              {
   108   3                  image_size = width * height * 2;
@@ -202,7 +202,7 @@ stmt  level    source
   163   2        }
   164   1      
   165   1          // 帧头
-C251 COMPILER V5.60.0,  seekfree_assistant                                                 29/09/26  17:14:56  PAGE 4   
+C251 COMPILER V5.60.0,  seekfree_assistant                                                 04/10/26  14:31:07  PAGE 4   
 
   166   1          temp_oscilloscope.head         = SEEKFREE_ASSISTANT_SEND_HEAD;
   167   1      
@@ -270,7 +270,7 @@ stmt  level    source
   226          // 参数说明     dot_y3          存放边线3纵坐标的地址  如果传递NULL参数则表示不发送边线3
   227          // 返回参数     void
   228          // 使用示例                     seekfree_assistant_camera_config(X_BOUNDARY, MT9V03X_H, x1_boundary, x2_b
-C251 COMPILER V5.60.0,  seekfree_assistant                                                 29/09/26  17:14:56  PAGE 5   
+C251 COMPILER V5.60.0,  seekfree_assistant                                                 04/10/26  14:31:07  PAGE 5   
 
              -oundary, x3_boundary, NULL, NULL, NULL);     // 图像发送时包含三条边线，边线只有横坐标
   229          // 使用示例                     seekfree_assistant_camera_config(Y_BOUNDARY, MT9V03X_W, NULL, NULL, NULL,
@@ -338,7 +338,7 @@ stmt  level    source
   286   4                      boundary_num++;
   287   4                      seekfree_assistant_camera_dot_data.valid_flag |= 1 << 1;
   288   4                      seekfree_assistant_camera_buffer.boundary_y[i++] = dot_y2;
-C251 COMPILER V5.60.0,  seekfree_assistant                                                 29/09/26  17:14:56  PAGE 6   
+C251 COMPILER V5.60.0,  seekfree_assistant                                                 04/10/26  14:31:07  PAGE 6   
 
   289   4                  }
   290   3                  if(NULL != dot_y3)
@@ -406,7 +406,7 @@ stmt  level    source
   348   1          uint32 read_length = 0;
   349   1        uint16 struct_len = sizeof(seekfree_assistant_parameter_struct);
   350   1          seekfree_assistant_parameter_struct *receive_packet;
-C251 COMPILER V5.60.0,  seekfree_assistant                                                 29/09/26  17:14:56  PAGE 7   
+C251 COMPILER V5.60.0,  seekfree_assistant                                                 04/10/26  14:31:07  PAGE 7   
 
   351   1        
   352   1          // 这里使用uint32进行定义，目的是为了保证数组四字节对齐
@@ -474,7 +474,7 @@ stmt  level    source
              -N);
   408   2          }
   409   1        EA = flag;
-C251 COMPILER V5.60.0,  seekfree_assistant                                                 29/09/26  17:14:56  PAGE 8   
+C251 COMPILER V5.60.0,  seekfree_assistant                                                 04/10/26  14:31:07  PAGE 8   
 
   410   1      }
   411          //-------------------------------------------------------------------------------------------------------

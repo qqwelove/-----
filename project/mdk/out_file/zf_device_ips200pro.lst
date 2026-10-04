@@ -1,4 +1,4 @@
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 1   
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 1   
 
 
 C251 COMPILER V5.60.0, COMPILATION OF MODULE zf_device_ips200pro
@@ -66,7 +66,7 @@ stmt  level    source
    50          
    51          #include "zf_common_debug.h"
    52          #include "zf_common_function.h"
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 2   
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 2   
 
    53          
    54          #include "zf_device_type.h"
@@ -134,7 +134,7 @@ stmt  level    source
   116              // 仅可读的参数
   117              IPS200PRO_SYSTEM_INFORMATION    = 0x10, // 屏幕ID编号、分辨率、固件版本
   118              IPS200PRO_SYSTEM_FREE_STACK,            // 系统空闲栈大小
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 3   
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 3   
 
   119              IPS200PRO_SYSTEM_GET_MAX,               // 占位使用
   120          
@@ -202,7 +202,7 @@ stmt  level    source
   182              struct common_packet\
   183              {\
   184                  IPS200PRO_HEADER;  \
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 4   
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 4   
 
   185                  uint16 dat[num]; \
   186              }nam;
@@ -270,7 +270,7 @@ stmt  level    source
   244          
   245          uint8 ips200pro_receive_buffer(void *buffer, uint32 length, uint32 time_out)
   246          {
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 5   
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 5   
 
   247   1          uint8 return_state = 1;
   248   1      
@@ -338,7 +338,7 @@ stmt  level    source
   308   1          uint8 return_state;
   309   1      
   310   1          temp->command1   = IPS200PRO_PARAMETER_GET;
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 6   
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 6   
 
   311   1          temp->command2   = command2;
   312   1          temp->length     = length;
@@ -406,7 +406,7 @@ stmt  level    source
   370          
   371          uint8 ips200pro_set_backlight(uint8 backlight)
   372          {
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 7   
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 7   
 
   373   1          uint8 return_state;
   374   1          IPS200PRO_COMMON_STRUCT(temp, 1);
@@ -474,7 +474,7 @@ stmt  level    source
   431   1          return_state = ips200pro_read_parameter(IPS200PRO_SYSTEM_DATE, (ips200pro_header_struct *)&temp, size
              -of(temp));
   432   1          if(0 == return_state)
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 8   
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 8   
 
   433   1          {
   434   2              memcpy(&time->year, &(temp.dat[0]), 4);
@@ -542,7 +542,7 @@ stmt  level    source
              -, (ips200pro_header_struct *)&temp, sizeof(temp), NULL, 0);
   493   2          }
   494   1      
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 9   
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 9   
 
   495   1          return return_state;
   496   1      }
@@ -610,7 +610,7 @@ stmt  level    source
   553   1      
   554   1          if(MAX_ID_PAGE > ips200pro_page_num)
   555   1          {
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 10  
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 10  
 
   556   2              return_state = ips200pro_create_widgets(++ips200pro_page_num | (IPS200PRO_WIDGETS_PAGE << 8), 0, 
              -0, 0, 0);
@@ -678,7 +678,7 @@ stmt  level    source
   614   1      
   615   1          if(MAX_ID_LABEL > lebel_num)
   616   1          {
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 11  
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 11  
 
   617   2              return_state = ips200pro_create_widgets(++lebel_num | (IPS200PRO_WIDGETS_LABEL << 8), x, y, width
              -, height);
@@ -746,7 +746,7 @@ stmt  level    source
   675   2              if(1 == return_state)
   676   2              {
   677   3                  table_num--;
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 12  
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 12  
 
   678   3              }
   679   2          }
@@ -814,7 +814,7 @@ stmt  level    source
   737   3                  meter_num--;
   738   3              }
   739   2          }
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 13  
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 13  
 
   740   1          return return_state == 1 ? 0 : (meter_num | (IPS200PRO_WIDGETS_METER << 8));
   741   1      }
@@ -882,7 +882,7 @@ stmt  level    source
   799   1          return_state = ips200pro_create_widgets(1 | (IPS200PRO_WIDGETS_CALENDAR << 8), x, y, width, height);
   800   1          return return_state == 1 ? 0 : (1 | (IPS200PRO_WIDGETS_CALENDAR << 8));
   801   1      }
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 14  
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 14  
 
   802          
   803          uint8 ips200pro_calendar_display(uint16 year, uint8 month, ips200pro_calendar_mode_enum mode)
@@ -950,7 +950,7 @@ stmt  level    source
   860   1      }
   861          
   862          uint8 ips200pro_waveform_line_type(uint16 waveform_id, uint8 line_type)
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 15  
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 15  
 
   863          {
   864   1          uint8 return_state;
@@ -1018,7 +1018,7 @@ stmt  level    source
   922   1          do
   923   1          {
   924   2              // 计算本次传输字节数
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 16  
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 16  
 
   925   2              send_length = image_size > (IPS200PRO_SPI_LENGTH - sizeof(temp)) ? (IPS200PRO_SPI_LENGTH - sizeof
              -(temp)) : (uint16)image_size;
@@ -1086,7 +1086,7 @@ stmt  level    source
   983   2              temp.dat[4] = rectangle_height;
   984   2              temp.dat[5] = color;
   985   2              return_state = ips200pro_write_packet(IPS200PRO_WIDGETS_IMAGE, IPS200PRO_IMAGE_DRAW_RECTANGLE, (u
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 17  
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 17  
 
              -int8)image_id, (ips200pro_header_struct *)&temp, sizeof(temp), NULL, 0);
   986   2          }
@@ -1154,7 +1154,7 @@ stmt  level    source
  1044   1          ips200pro_page_set_title_position_width(title_position, title_size);
  1045   1      
  1046   1          ips200pro_set_format(IPS200PRO_DEFAULT_FORMAT);
-C251 COMPILER V5.60.0,  zf_device_ips200pro                                                29/09/26  17:14:53  PAGE 18  
+C251 COMPILER V5.60.0,  zf_device_ips200pro                                                04/10/26  14:31:04  PAGE 18  
 
  1047   1          ips200pro_set_default_font(IPS200PRO_DEFAULT_FONT_SIZE);
  1048   1          ips200pro_set_optimize(IPS200PRO_DEFAULT_OPTIMIZE);

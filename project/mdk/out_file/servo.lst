@@ -1,4 +1,4 @@
-C251 COMPILER V5.60.0,  servo                                                              04/10/26  12:51:52  PAGE 1   
+C251 COMPILER V5.60.0,  servo                                                              04/10/26  19:16:37  PAGE 1   
 
 
 C251 COMPILER V5.60.0, COMPILATION OF MODULE servo
@@ -15,8 +15,8 @@ stmt  level    source
     3          
     4          
     5          /* ★定义成变量（不是宏），VOFA 才能取地址在线调 */
-    6          float servo_kp = 0.31f;
-    7          float servo_kd = 0.05f;
+    6          float servo_kp = 0.35f;
+    7          float servo_kd = 0.01f;
     8          
     9          
    10          

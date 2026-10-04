@@ -1,4 +1,4 @@
-C251 COMPILER V5.60.0,  zf_device_ips114                                                   29/09/26  17:14:52  PAGE 1   
+C251 COMPILER V5.60.0,  zf_device_ips114                                                   04/10/26  14:31:04  PAGE 1   
 
 
 C251 COMPILER V5.60.0, COMPILATION OF MODULE zf_device_ips114
@@ -66,7 +66,7 @@ stmt  level    source
    50          
    51          #include "zf_common_clock.h"
    52          #include "zf_common_debug.h"
-C251 COMPILER V5.60.0,  zf_device_ips114                                                   29/09/26  17:14:52  PAGE 2   
+C251 COMPILER V5.60.0,  zf_device_ips114                                                   04/10/26  14:31:04  PAGE 2   
 
    53          #include "zf_common_font.h"
    54          #include "zf_common_function.h"
@@ -134,7 +134,7 @@ stmt  level    source
   112   1          {
   113   2              ips114_write_index(0x2a);                                               // 列地址设置
   114   2              ips114_write_16bit_data(x1+52);
-C251 COMPILER V5.60.0,  zf_device_ips114                                                   29/09/26  17:14:52  PAGE 3   
+C251 COMPILER V5.60.0,  zf_device_ips114                                                   04/10/26  14:31:04  PAGE 3   
 
   115   2              ips114_write_16bit_data(x2+52);
   116   2              ips114_write_index(0x2b);                                               // 行地址设置
@@ -202,7 +202,7 @@ stmt  level    source
              -------------
   176          // 函数简介       设置显示方向 这个函数只有在初始化屏幕之前调用才生效
   177          // 参数说明       dir             显示方向  参照 zf_device_ips114.h 内 ips114_dir_enum 枚举体定义
-C251 COMPILER V5.60.0,  zf_device_ips114                                                   29/09/26  17:14:52  PAGE 4   
+C251 COMPILER V5.60.0,  zf_device_ips114                                                   04/10/26  14:31:04  PAGE 4   
 
   178          // 返回参数      void
   179          // 使用示例                ips114_set_dir(IPS114_CROSSWISE);
@@ -270,7 +270,7 @@ stmt  level    source
   235          // 参数说明       y               坐标y方向的起点 参数范围 [0, ips114_y_max-1]
   236          // 参数说明       dat             需要显示的字符
   237          // 返回参数      void
-C251 COMPILER V5.60.0,  zf_device_ips114                                                   29/09/26  17:14:52  PAGE 5   
+C251 COMPILER V5.60.0,  zf_device_ips114                                                   04/10/26  14:31:04  PAGE 5   
 
   238          // 使用示例                ips114_show_char(0,0,'x');                      // 坐标 0,0 写一个字符 x
   239          //-------------------------------------------------------------------------------------------------------
@@ -338,7 +338,7 @@ stmt  level    source
   295   1        uint8 a[3];
   296   1          uint8 i;
   297   1        
-C251 COMPILER V5.60.0,  zf_device_ips114                                                   29/09/26  17:14:52  PAGE 6   
+C251 COMPILER V5.60.0,  zf_device_ips114                                                   04/10/26  14:31:04  PAGE 6   
 
   298   1          zf_assert(x < ips114_x_max);
   299   1          zf_assert(y < ips114_y_max);
@@ -406,7 +406,7 @@ stmt  level    source
   357          {
   358   1          uint8 a[5];
   359   1          uint8 i;
-C251 COMPILER V5.60.0,  zf_device_ips114                                                   29/09/26  17:14:52  PAGE 7   
+C251 COMPILER V5.60.0,  zf_device_ips114                                                   04/10/26  14:31:04  PAGE 7   
 
   360   1        
   361   1          zf_assert(x < ips114_x_max);
@@ -474,7 +474,7 @@ stmt  level    source
   420          // 参数说明       num             需要显示的位数 最高10位  不包含正负号
   421          // 返回参数      void
   422          // 使用示例                ips114_show_int32(0,0,x,3);                     // x 可以为 int32 uint16 int16
-C251 COMPILER V5.60.0,  zf_device_ips114                                                   29/09/26  17:14:52  PAGE 8   
+C251 COMPILER V5.60.0,  zf_device_ips114                                                   04/10/26  14:31:04  PAGE 8   
 
              - uint8 int8 类型
   423          // note:                        负数会显示一个 ‘-’号   正数显示一个空格
@@ -542,7 +542,7 @@ stmt  level    source
   481   1          else
   482   1          {
   483   2              length = zf_sprintf( &buff[1],(const int8 *)"%f",dat);
-C251 COMPILER V5.60.0,  zf_device_ips114                                                   29/09/26  17:14:52  PAGE 9   
+C251 COMPILER V5.60.0,  zf_device_ips114                                                   04/10/26  14:31:04  PAGE 9   
 
   484   2              length++;
   485   2          }
@@ -610,7 +610,7 @@ stmt  level    source
   542          //-------------------------------------------------------------------------------------------------------
              -------------
   543          // 函数简介     IPS114 显示 8bit 灰度图像 带二值化阈值
-C251 COMPILER V5.60.0,  zf_device_ips114                                                   29/09/26  17:14:52  PAGE 10  
+C251 COMPILER V5.60.0,  zf_device_ips114                                                   04/10/26  14:31:04  PAGE 10  
 
   544          // 参数说明     x               坐标x方向的起点 参数范围 [0, ips114_x_max-1]
   545          // 参数说明     y               坐标y方向的起点 参数范围 [0, ips114_y_max-1]
@@ -678,7 +678,7 @@ stmt  level    source
              -------------
   603          // 函数简介       汉字显示
   604          // 参数说明       x               坐标x方向的起点 参数范围 [0, ips114_x_max-1]
-C251 COMPILER V5.60.0,  zf_device_ips114                                                   29/09/26  17:14:52  PAGE 11  
+C251 COMPILER V5.60.0,  zf_device_ips114                                                   04/10/26  14:31:04  PAGE 11  
 
   605          // 参数说明       y               坐标y方向的起点 参数范围 [0, ips114_y_max-1]
   606          // 参数说明       siz            取模的时候设置的汉字字体大小 也就是一个汉字占用的点阵长宽为多少个点 取模
@@ -746,7 +746,7 @@ stmt  level    source
   662   1          gpio_init(IPS114_DC_PIN, GPO, GPIO_LOW, GPO_PUSH_PULL);
   663   1          gpio_init(IPS114_RST_PIN, GPO, GPIO_LOW, GPO_PUSH_PULL);
   664   1          gpio_init(IPS114_CS_PIN, GPO, GPIO_LOW, GPO_PUSH_PULL);
-C251 COMPILER V5.60.0,  zf_device_ips114                                                   29/09/26  17:14:52  PAGE 12  
+C251 COMPILER V5.60.0,  zf_device_ips114                                                   04/10/26  14:31:04  PAGE 12  
 
   665   1          gpio_init(IPS114_BLK_PIN, GPO, GPIO_HIGH, GPO_PUSH_PULL);
   666   1      
@@ -814,7 +814,7 @@ stmt  level    source
   728   1          ips114_write_8bit_data(0x18);
   729   1          ips114_write_8bit_data(0x0D);
   730   1          ips114_write_8bit_data(0x0B);
-C251 COMPILER V5.60.0,  zf_device_ips114                                                   29/09/26  17:14:52  PAGE 13  
+C251 COMPILER V5.60.0,  zf_device_ips114                                                   04/10/26  14:31:04  PAGE 13  
 
   731   1          ips114_write_8bit_data(0x1F);
   732   1          ips114_write_8bit_data(0x23);
