@@ -200,110 +200,40 @@ uint8 track_out_check(void)
     else
     {
         track_out_cnt = 0;                                  /* 只要有一帧不像，就重新计数 */
-        if (TRACK_OUT_LATCH == 0) track_out_flag = 0;       /* ★调试模式：条件消失就自动解除
-                                                                （原来这里没有复位 → 误判一次就永远停机） */
     }
 
     return track_out_flag;
 }
 
 
-/*============================== 十字路口：锁一条直线通过 ==============================*/
-/* ★★【调试开关】改成 0 = 整块关掉十字处理 ★★
-   用途：过弯出现异常时先关掉它跑同一个弯，用来区分“是十字模块的问题”还是“扫线/控制环的问题” */
+/*============================== 十字补线（最小二乘拟合进入方向） ==============================*/
+/* ★★【调试开关】改成 0 = 整块关掉十字补线 ★★
+   用途：过弯出现“先偏一下 → 瞬间打直 → 冲出去”时，先把它关掉跑同一个弯：
+     现象消失  → 就是十字模块在弯道误触发（下一步修它的判据）
+     现象还在  → 与十字模块无关（去查控制环 / 扫线 / 其它） */
 #define CROSS_FILL_ENABLE   1
 
-/* ---- 判据：决定“前方是不是十字” ---- */
-#define CROSS_NEAR_S      100    /* 近处（车头附近）行区间 */
-#define CROSS_NEAR_E      119
-#define CROSS_GAP_MIN       4    /* 开口至少 4 行才算十字 */
-#define CROSS_NEAR_OK       5    /* 近端至少 5 行双侧有线（确认“我还在赛道上”） */
-#define CROSS_FIT_MIN       4    /* 拟合进入方向至少需要 4 个有效点 */
-#define CROSS_SLOPE_MAX  0.8f    /* 近端中线斜率超过它 = 正在弯道里 → 不认十字 */
+#define CROSS_GAP_MIN     4      /* 开口至少 3 行才算十字 */
+#define CROSS_NEAR_OK     5      /* 近端至少 5 行双侧有线 */
+#define CROSS_FIT_MIN     4      /* 拟合至少需要 4 个有效点 */
+#define CROSS_MID_SAFE    25     /* 参考行中线合理范围：25~163，超出说明被交叉赛道边线带偏 */
+#define CROSS_MID_LIMIT   20     /* 中线相对“入口处”最多偏 20 像素（≈6° 舵角，原来 40 太大） */
 
-/* ---- 状态机：决定“十字里怎么走”和“什么时候结束” ---- */
-#define CROSS_INSIDE_NUM   10    /* 近处两侧都丢线超过这么多行 → 确认已进到十字内部 */
-#define CROSS_EXIT_NUM      3    /* 近处两侧都丢线少到这么多行 → 认为已经穿过十字 */
-#define CROSS_TIMEOUT     100    /* 超时保护（帧）：按“过一个十字的帧数 ×3”来定 */
+/* 调试用：打到屏幕上就能看出斜率和偏向 */
+int16 dbg_cross_a100 = 0;   /* 进入方向斜率 ×100 */
+uint8 dbg_cross_m0   = 0;   /* 入口处中线 */
+uint8 dbg_cross_m94  = 0;   /* 控制行(94)的中线 */
 
-/* ---- 十字期间的中线值：94 = 图像中心 = 舵机中值 = 直行 ----
-   如果十字里车头会固定偏一边（舵机中值不是机械直行），把这个值改 94±偏差（每次改 2~3 试） */
-#define CROSS_STRAIGHT     IMG_CENTER
-
-/* 调试用：打到屏幕上就能看出为什么判/没判十字 */
-int16 dbg_cross_a100       = 0;   /* 进入方向斜率 ×100（弯道标定就看它） */
-uint8 dbg_cross_m0         = 0;   /* 入口处中线 */
-uint8 dbg_cross_m94        = 0;   /* 控制行(94)的中线 */
-uint8 dbg_cross_nearlost   = 0;   /* 近处(100~119)两侧都丢线的行数 */
-
-/* 十字状态机 */
-uint8  cross_state       = 0;     /* 0 = 正常巡线  1 = 正在过十字（中线压直） */
-uint8  cross_inside_flag = 0;     /* 1 = 已经确认进到十字内部 */
-uint16 cross_time        = 0;     /* 进十字后的帧数 */
-
-
-/*-------------------------------------------------------------------
- * 十字期间：把整条中线压成一条竖直线（默认 = 图像中心 94）
- *   原理：mid_line 全是 94 → 控制行 err = 0 → 舵机回中 → 车头摆正 → 直行通过
- *   ★为什么不用“沿进入方向外推/两端插值”：
- *     那种补法每帧算出来的形状都在变（近端断点、远端断点、拟合斜率都在动），
- *     舵机就跟着一帧一变 → 表现为“过十字时轮子左右摆”，加速后更明显。
- *     锁成一条固定直线后，输出完全稳定，十字就变成“一段直赛道”。
- *------------------------------------------------------------------*/
-static void cross_set_straight(uint8 *l_line, uint8 *r_line, uint8 *m_line)
-{
-    int row;
-    for (row = END_ROW; row <= START_ROW; row++)
-    {
-        m_line[row] = CROSS_STRAIGHT;
-        l_line[row] = (CROSS_STRAIGHT > 25) ? (uint8)(CROSS_STRAIGHT - 20) : 0;   /* 边线一起补直， */
-        r_line[row] = (CROSS_STRAIGHT < IMG_W - 25) ? (uint8)(CROSS_STRAIGHT + 20) : (IMG_W - 1);  /* 只为显示一致 */
-        left_find_flag[row]  = 1;
-        right_find_flag[row] = 1;
-    }
-}
-
-
-/*-------------------------------------------------------------------
- * 十字处理：状态机（判定 → 锁直线直行 → 穿过 → 释放）
- * 返回 1 = 本帧按十字处理（已经改过 mid_line）；0 = 正常巡线
- *------------------------------------------------------------------*/
 uint8 cross_fill_new(uint8 *l_line, uint8 *r_line, uint8 *m_line)
 {
-    int row, near_lost, near_both_lost, far_found;
-    int ok, n, mm, mm0;
+    int row, near_lost = -1, far_found = -1;
+    int ok = 0, n = 0, t, span, mm, mm0;
+    int L0, R0, L1, R1, l, r, m, m_end;
     float sx = 0, sy = 0, sxx = 0, sxy = 0, den, a = 0.0f, b = 0.0f;
 
-    if (CROSS_FILL_ENABLE == 0) return 0;
+    if (CROSS_FILL_ENABLE == 0) return 0;      /* ★调试开关：整块关掉 */
 
-    /* ==================== 状态 1：正在过十字 ==================== */
-    if (cross_state == 1)
-    {
-        cross_time++;
-
-        /* 近处（车头附近）两侧都丢线的行数 */
-        near_both_lost = 0;
-        for (row = CROSS_NEAR_S; row <= CROSS_NEAR_E; row++)
-            if (!left_find_flag[row] && !right_find_flag[row]) near_both_lost++;
-        dbg_cross_nearlost = (uint8)near_both_lost;
-
-        if (near_both_lost >= CROSS_INSIDE_NUM) cross_inside_flag = 1;      /* 确认进到里面了 */
-
-        /* 出十字：已经进过内部 + 近处重新见线；或者超时保护 */
-        if ((cross_inside_flag && near_both_lost <= CROSS_EXIT_NUM) || cross_time > CROSS_TIMEOUT)
-        {
-            cross_state       = 0;
-            cross_inside_flag = 0;
-            return 0;                       /* 本帧起恢复正常巡线 */
-        }
-
-        cross_set_straight(l_line, r_line, m_line);   /* ★锁直线：当普通直赛道冲过去 */
-        dbg_cross_m94 = CROSS_STRAIGHT;
-        return 1;
-    }
-
-    /* ==================== 状态 0：正常巡线，判断前方是不是十字 ==================== */
-    dbg_cross_a100 = 0;                     /* 没触发就显示 0，屏幕上好分辨 */
+    dbg_cross_a100 = 0;                        /* ★本帧没走到这里就显示 0，方便在屏幕上分辨 */
     dbg_cross_m0   = 0;
     dbg_cross_m94  = 0;
 
@@ -311,18 +241,23 @@ uint8 cross_fill_new(uint8 *l_line, uint8 *r_line, uint8 *m_line)
     for (row = START_ROW; row >= END_ROW; row--)
         if (!left_find_flag[row] && !right_find_flag[row]) { near_lost = row; break; }
 
-    if (near_lost < 0 || near_lost <= END_ROW + CROSS_GAP_MIN) return 0;   /* 前方没有开口 */
+    if (near_lost < 0 || near_lost <= END_ROW + CROSS_GAP_MIN) return 0;   /* 没有开口 → 正常巡线 */
 
-    /* 开口离车头太近（车头下面就是坏行）→ 不是十字，直接放行 */
+    /* ★新增：开口离车头太近（车头下面就有坏行）→ 根本不是十字，直接放行。
+       否则第 2 步一行都统计不到（ok=n=0），会掉进兜底分支把整条中线写成 94 →
+       弯道里就是“瞬间打直 → 冲出去” */
     if (near_lost > START_ROW - CROSS_NEAR_OK) return 0;
 
-    /* --- 2) 近端有效行：够多 + 顺便最小二乘拟合“进入方向”（只用来否决，不用来补线）--- */
-    ok = 0; n = 0;
+    /* --- 2) 近端有效行：够多 + 顺便做最小二乘拟合 --- */
     for (row = near_lost + 1; row <= START_ROW; row++)
     {
         if (left_find_flag[row] && right_find_flag[row])
         {
             mm = ((int)l_line[row] + (int)r_line[row]) / 2;
+
+            /* ★原来这里有一句“中线跑到很边上就 continue”——急弯里会把合法的行全部剔除，
+               ok 掉到 5 以下反而触发兜底打正 → 已改成拟合完成后统一否决 */
+
             ok++;
             sx  += (float)row;
             sy  += (float)mm;
@@ -331,53 +266,78 @@ uint8 cross_fill_new(uint8 *l_line, uint8 *r_line, uint8 *m_line)
             n++;
         }
     }
-    if (ok < CROSS_NEAR_OK || n < CROSS_FIT_MIN) return 0;   /* 数据不够 → 放行，绝不强制打正 */
 
-    /* ★近端必须够“干净”：[near_lost+1, 119] 里至少 3/4 的行两侧都有线。
-       防止“线是慢慢糊掉、慢慢丢的”那种渐变情况被当成十字 */
-    if (ok * 4 < (START_ROW - near_lost) * 3) return 0;
+    if (ok < CROSS_NEAR_OK || n < CROSS_FIT_MIN)
+    {
+        /* ★数据不够 → 直接放行：保留 scan_lines 算出来的中线（它会跟着可见的边线走）。
+           绝不“强制打正”：打正是主动把车掰直，是这里最危险的动作 */
+        return 0;
+    }
 
-    /* --- 2.5) ★★最关键的一条：断口必须是“内部开口” ---
-       也就是：近处有线 → 中间断开 → 【远处又看到线】。
-       这一条把“图像最上方看不清”这种正常情况彻底排除掉：
-           正常赛道：最上方看不清 → 丢失区一直延伸到图像顶部 → 断口上方永远找不到线（far_found < 0）
-           真十字  ：断口上方还能看到十字对面的赛道 → far_found >= 0
-       ★没有这一条时：直道上（图像上部丢线）也会被当成十字 → 强制直行 →
-         等车开到弯道就“不转弯、直接冲出赛道” */
-    far_found = -1;
-    for (row = near_lost - 1; row >= END_ROW; row--)
-        if (left_find_flag[row] && right_find_flag[row]) { far_found = row; break; }
-
-    if (far_found < 0) return 0;                            /* 断口上方看不到线 → 不是十字 */
-    if (near_lost - far_found < CROSS_GAP_MIN) return 0;    /* 断口太小 → 不是十字 */
-
+    /* ★最小二乘拟合 mid = a*row + b：这才是真正的“进入方向”（含透视关系） */
     den = (float)n * sxx - sx * sx;
-    if (den > 1.0f)
-    {
-        a = ((float)n * sxy - sx * sy) / den;
-        b = (sy - a * sx) / (float)n;
-    }
-    else
-    {
-        a = 0.0f;
-        b = (float)mid_line[near_lost + 1];
-    }
+    if (den > 1.0f) { a = ((float)n * sxy - sx * sy) / den;  b = (sy - a * sx) / (float)n; }
+    else            { a = 0.0f;  b = (float)mid_line[near_lost + 1]; }
 
     dbg_cross_a100 = (int)(a * 100.0f);
     dbg_cross_m0   = (uint8)(a * (float)(near_lost + 1) + b);
 
-    /* --- 3) 正在过弯就不认十字（防止弯道里误判）--- */
-    mm0 = (int)(a * (float)(near_lost + 1) + b);            /* 入口处的中线（用拟合值，避免读到哨兵） */
-    if (mm0 < 40 || mm0 > 148) return 0;                    /* 入口处中线已经偏了 → 车正在大转向 */
-    if (a > CROSS_SLOPE_MAX || a < -CROSS_SLOPE_MAX) return 0;   /* 斜率太大 → 正在弯道里 */
+    /* ★★新增：正在过弯就不认十字（等价于祖传 shizi_state_1 的 |mid-94|>30，用斜率更准）。
+       a 的含义：每向远处 1 行，中线横向移动多少像素。用 dbg_cross_a100 标定这个门槛 */
+    mm0 = ((int)l_line[near_lost + 1] + (int)r_line[near_lost + 1]) / 2;
+    if (mm0 < 40 || mm0 > 148) return 0;      /* 入口处中线已经偏了 → 车正在大转向 */
+    if (a > 0.8f || a < -0.8f) return 0;      /* 近端中线斜率太大 → 正在弯道里 */
 
-    /* --- 4) 判据全部通过 → 进入十字状态，本帧就开始直行 --- */
-    cross_state       = 1;
-    cross_inside_flag = 0;
-    cross_time        = 0;
+    /* --- 3) 远端有没有重新看到赛道 --- */
+    for (row = near_lost - 1; row >= END_ROW; row--)
+        if (left_find_flag[row] && right_find_flag[row]) { far_found = row; break; }
 
-    cross_set_straight(l_line, r_line, m_line);
-    dbg_cross_m94 = CROSS_STRAIGHT;
+    if (far_found > 0 && far_found < near_lost)
+    {
+        /* ===== A. 远端看得到 → 两端线性插值 ===== */
+        L0 = l_line[near_lost + 1];  R0 = r_line[near_lost + 1];
+        L1 = l_line[far_found];      R1 = r_line[far_found];
+        span = (near_lost + 1) - far_found;
+
+        for (row = far_found; row <= near_lost; row++)
+        {
+            t = row - far_found;
+            l = L1 + (L0 - L1) * t / span;
+            r = R1 + (R0 - R1) * t / span;
+            m = (l + r) / 2;
+            if (l < 0) l = 0;  if (l > IMG_W - 1) l = IMG_W - 1;
+            if (r < 0) r = 0;  if (r > IMG_W - 1) r = IMG_W - 1;
+            if (r - l < 10) { l = m - 5; r = m + 5; }        /* 边线交叉保护 */
+
+            l_line[row] = (uint8)l;  r_line[row] = (uint8)r;  m_line[row] = (uint8)m;
+        }
+    }
+    else
+    {
+        /* ===== B. 远端看不到（最常见）→ 沿拟合出来的进入方向外推 ===== */
+        m_end = (int)(a * (float)near_lost + b);             /* 入口行处的拟合值 = 限幅基准 */
+
+        for (row = END_ROW; row <= near_lost; row++)
+        {
+            m = (int)(a * (float)row + b);                   /* 直接用拟合直线，斜率不再被量化 */
+
+            if (m > m_end + CROSS_MID_LIMIT) m = m_end + CROSS_MID_LIMIT;   /* ±20 收紧 */
+            if (m < m_end - CROSS_MID_LIMIT) m = m_end - CROSS_MID_LIMIT;
+            if (m < 0) m = 0;  if (m > IMG_W - 1) m = IMG_W - 1;
+
+            l = m - 20;  r = m + 20;                         /* 示意边线，只为显示 */
+            if (l < 0) l = 0;  if (r > IMG_W - 1) r = IMG_W - 1;
+
+            l_line[row] = (uint8)l;  r_line[row] = (uint8)r;  m_line[row] = (uint8)m;
+        }
+    }
+
+    dbg_cross_m94 = m_line[CONTROL_ROW];
+
+    /* --- 4) 补过的行标记为“已找到” --- */
+    for (row = (far_found > 0 ? far_found : END_ROW); row <= near_lost; row++)
+    { left_find_flag[row] = 1; right_find_flag[row] = 1; }
+
     return 1;
 }
 
@@ -432,6 +392,12 @@ float compute_servo_angle(uint8 *mid_line, uint8 row, uint8 center_col,
 /* 巡线总流程：主循环在 image_update() 之后、image_frame_done() 之前调用 */
 void tracking_task(void)
 {
+    /* ★★出界保护放在最前面：一旦判出界，直接把电机置零，本帧不再巡线、不再打舵 ★★ */
+    if (track_out_check())
+    {
+        motor_enable_set(0);      /* 电机置零  */
+        return;
+    }
 
     scan_lines(image_get_threshold(), left_line, right_line, mid_line, START_ROW, END_ROW);
     cross_flag = cross_fill_new(left_line, right_line, mid_line);
@@ -442,11 +408,6 @@ void tracking_task(void)
     servo_set_angle( compute_servo_angle(mid_line, CONTROL_ROW, IMG_CENTER,
                                          servo_kp, servo_kd,
                                          SERVO_MID, SERVO_RIGHT_MAX, SERVO_LEFT_MEX) );
-
-    /* ★出界保护放在最后：只切电机，绝不跳过舵机更新。
-       原来它在最前面 + 直接 return → 出界后舵机再也不更新，车不能转弯、只能直线滑出赛道 */
-    if (track_out_check())          motor_enable_set(0);   /* 判出界 → 切电机 */
-    else if (TRACK_OUT_LATCH == 0)  motor_enable_set(1);   /* 调试模式：条件消失就自动恢复 */
 
     /* ★以后元素判断（环岛/斑马线/出界）就插在这一行前面，改完 mid_line 再算角度 */
 }

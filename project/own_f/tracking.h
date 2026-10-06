@@ -47,12 +47,6 @@ extern int16 dbg_cross_a100;   /* 进入方向斜率 ×100 */
 extern uint8 dbg_cross_m0;   /* 入口处中线 */
 extern uint8 dbg_cross_m94;   /* 控制行(94)的中线 */
 
-/* 十字状态机（调试用，可打到屏上看） */
-extern uint8  cross_state;         /* 0 = 正常巡线  1 = 正在过十字（中线压直） */
-extern uint8  cross_inside_flag;   /* 1 = 已确认进到十字内部 */
-extern uint16 cross_time;          /* 进十字后的帧数 */
-extern uint8  dbg_cross_nearlost;  /* 近处(100~119)两侧都丢线的行数 */
-
 
 void  scan_lines(uint8 threshold, uint8 *left_line, uint8 *right_line, uint8 *mid_line,
                  uint8 start_row, uint8 end_row);
