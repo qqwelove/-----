@@ -26,40 +26,128 @@ static int16 half_w_mem[IMG_H];
 #define MID_FILTER_WIN   3
 #define MID_HALF         (MID_FILTER_WIN / 2)
 
+/*============================== 左右边线独立跟踪 ==============================*/
+/* 【为什么改】原来是“从上一行的中线出发，向左/向右找第一个白→黑跳变”。
+   这个写法有个致命弱点：弯道急到“边线跑到中线另一侧”时，搜索方向就反了，
+   线明明还在画面里却报“丢线” → 中线只能继承上一行 → 车不转弯 → 冲出赛道。
+   【新写法】左右边线各自独立跟踪，谁都不依赖中线：
+     · 每一行以上一行的“同侧边线位置”为期望，只在 ±EDGE_WIN 窗口内找；
+     · 窗口内没有，放宽到 ±EDGE_WIN_FAR 再找一次（跨小缺口）；
+     · 找到就更新期望，丢了就保持期望不动 → 缺口过后还能接回同一条线；
+     · 因为限定在窗口内，不会跳到十字对面赛道的边线或画面外的噪声上去。
+   【抗噪】要求黑线至少连续 EDGE_MIN_BLACK 个像素，滤掉单点黑点。 */
+#define EDGE_WIN        22      /* 跟踪窗口半宽：相邻两行边线正常不会移动超过这么多像素 */
+#define EDGE_WIN_FAR    60      /* 放宽窗口：跨过小缺口/短暂丢失后的找回范围 */
+#define EDGE_MIN_BLACK  2       /* 黑线最少连续像素数（噪点多就加大；远处丢线太多就改成 1） */
+
+
 /*-------------------------------------------------------------------
- * 逐行提取左右边线并合成中线
- * 赛道模型：白底 + 两侧黑边线；从上一行中线位置出发，向左右找“白→黑”跳变（黑线内沿）
- * ★丢线时保留哨兵值：左丢 left_line=0，右丢 right_line=IMG_W-1
- *    —— cross_fill_new 的 LOST_THRESHOLD 判据就是靠这两个值识别丢线的，千万别改！
+ * 在 row 行、以 c0 为中心、±win 范围内找一条边线，取离 c0 最近的那个
+ *   side = 0: 左边界（白→黑，黑线右沿 = 赛道内沿）
+ *   side = 1: 右边界（白→黑，黑线左沿 = 赛道内沿）
+ * 返回列号；范围内没找到返回 -1
+ *------------------------------------------------------------------*/
+static int16 find_edge_near(uint16 row, uint8 threshold, uint8 side, int16 c0, int16 win)
+{
+    int16 col, d, best = -1, bestd = 32767;
+    int16 lo = c0 - win;
+    int16 hi = c0 + win;
+
+    if (lo < 4)         lo = 4;
+    if (hi > IMG_W - 4) hi = IMG_W - 4;
+
+    for (col = lo; col <= hi; col++)
+    {
+        if (side == 0)
+        {
+            if (!(mt9v03x_image[row][col]     >  threshold
+               && mt9v03x_image[row][col - 1] <= threshold)) continue;
+            if (EDGE_MIN_BLACK >= 2 && mt9v03x_image[row][col - 2] > threshold) continue;
+        }
+        else
+        {
+            if (!(mt9v03x_image[row][col]     >  threshold
+               && mt9v03x_image[row][col + 1] <= threshold)) continue;
+            if (EDGE_MIN_BLACK >= 2 && mt9v03x_image[row][col + 2] > threshold) continue;
+        }
+        d = (col > c0) ? (col - c0) : (c0 - col);
+        if (d < bestd) { bestd = d; best = col; }
+    }
+    return best;
+}
+
+
+/*-------------------------------------------------------------------
+ * 从图像中心向两侧找边线：只用在“最底下一行”定初始种子（那一行没有上一行可参考）
+ *------------------------------------------------------------------*/
+static int16 find_edge_center(uint16 row, uint8 threshold, uint8 side)
+{
+    int16 col;
+
+    if (side == 0)
+    {
+        for (col = IMG_CENTER; col >= 4; col--)
+        {
+            if (mt9v03x_image[row][col]     >  threshold
+             && mt9v03x_image[row][col - 1] <= threshold)
+            {
+                if (EDGE_MIN_BLACK >= 2 && mt9v03x_image[row][col - 2] > threshold) continue;
+                return col;
+            }
+        }
+    }
+    else
+    {
+        for (col = IMG_CENTER; col <= IMG_W - 4; col++)
+        {
+            if (mt9v03x_image[row][col]     >  threshold
+             && mt9v03x_image[row][col + 1] <= threshold)
+            {
+                if (EDGE_MIN_BLACK >= 2 && mt9v03x_image[row][col + 2] > threshold) continue;
+                return col;
+            }
+        }
+    }
+    return -1;
+}
+
+
+/*-------------------------------------------------------------------
+ * 逐行提取左右边线并合成中线（索引：0 = 最远，119 = 车头）
+ * ★丢线时保留哨兵值：左丢 left_line=0，右丢 right_line=IMG_W-1；
+ *   同时置 left_find_flag / right_find_flag —— 十字判据靠 flag 识别丢线，别改！
  *------------------------------------------------------------------*/
 void scan_lines(uint8 threshold, uint8 *left_line, uint8 *right_line, uint8 *mid_line,
                 uint8 start_row, uint8 end_row)
 {
-    int16 row, col;
+    int16 row;
     int16 left, right, m, hw;
-    uint8 center = IMG_CENTER;
+    int16 c_l = IMG_CENTER;             /* 左边界“期望位置”（上一行左边界） */
+    int16 c_r = IMG_CENTER;             /* 右边界“期望位置”（上一行右边界） */
     int16 last_w = HALF_W_DEF;
-    int16 row_w  = START_ROW;              /* ★last_w 是在哪一行学到的（透视缩放要用） */
-    static uint8 mid_head_mem = IMG_CENTER;
-    uint8 head_fallback = mid_head_mem;
+    int16 row_w  = START_ROW;           /* last_w 是在哪一行学到的（透视缩放要用） */
+    static uint8 mid_head_mem = IMG_CENTER;   /* 上一帧车头处的中线 */
 
     for (row = start_row; row >= (int16)end_row; row--)
     {
-        left  = -1;
-        right = -1;
+        if (row == (int16)start_row)
+        {
+            /* 第一行没有上一行可参考 → 从图像中心向两侧找，定初始种子 */
+            left  = find_edge_center((uint16)row, threshold, 0);
+            right = find_edge_center((uint16)row, threshold, 1);
+        }
+        else
+        {
+            /* ★左右各自独立跟踪：只在自己的期望位置附近找 */
+            left  = find_edge_near((uint16)row, threshold, 0, c_l, EDGE_WIN);
+            if (left  < 0) left  = find_edge_near((uint16)row, threshold, 0, c_l, EDGE_WIN_FAR);
 
-        /* 左边界：从 center 向左找 白→黑 跳变（黑线右沿 = 白路面左边界） */
-        for (col = center; col >= 3; col--)
-        {
-            if (mt9v03x_image[row][col] > threshold && mt9v03x_image[row][col - 1] <= threshold)
-            { left = col; break; }
+            right = find_edge_near((uint16)row, threshold, 1, c_r, EDGE_WIN);
+            if (right < 0) right = find_edge_near((uint16)row, threshold, 1, c_r, EDGE_WIN_FAR);
         }
-        /* 右边界：从 center 向右找 白→黑 跳变 */
-        for (col = center; col < IMG_W - 3; col++)
-        {
-            if (mt9v03x_image[row][col] > threshold && mt9v03x_image[row][col + 1] <= threshold)
-            { right = col; break; }
-        }
+
+        if (left  >= 0) c_l = left;     /* 只有找到才更新期望，丢了保持不动 */
+        if (right >= 0) c_r = right;
 
         /* 存边线：丢线保留哨兵值 + 置标志位 */
         if (left  < 0) { left_find_flag[row]  = 0; left_line[row]  = 0;           }
@@ -68,8 +156,8 @@ void scan_lines(uint8 threshold, uint8 *left_line, uint8 *right_line, uint8 *mid
         if (right < 0) { right_find_flag[row] = 0; right_line[row] = IMG_W - 1;   }
         else           { right_find_flag[row] = 1; right_line[row] = (uint8)right;}
 
-        /* ★该行半宽：优先用本行学到的值；没有就按透视关系 (row - 地平线行) 把 last_w 缩放到本行。
-           直接用 last_w（那是更靠车的行，赛道理应更宽）会让远处行的半宽偏大，
+        /* ★该行半宽：优先用本行学到的值；没有就按透视关系 (row - 地平线行) 缩放 last_w。
+           直接用 last_w（那是更靠车的行，赛道理应更宽）会让远处行半宽偏大，
            单边丢线时把中线推到弯外 → 弯道冲出去 */
         if (half_w_mem[row] != 0)
         {
@@ -89,24 +177,19 @@ void scan_lines(uint8 threshold, uint8 *left_line, uint8 *right_line, uint8 *mid
         /* 合成中线：单边丢线用半赛道宽推算，双边丢线继承更近的一行
            ★只写 mid_line，绝对不要回写 left_line / right_line！ */
         if (left_find_flag[row] && right_find_flag[row])
-                {
-                    int16 w = ((int16)right_line[row] - (int16)left_line[row]) / 2;
-                
-                    /* ★在线标定“这一行”的半宽 */
-                    if (w > HALF_W_MIN && w < HALF_W_MAX)
-                    {
-                        if (half_w_mem[row] == 0) half_w_mem[row] = w;
-                        else half_w_mem[row] = (half_w_mem[row] * 7 + 1 * w) / 8;   /* 1/8 步长平滑 */
-                        last_w = half_w_mem[row];
-                        row_w  = row;                              /* ★记录学到该半宽的行号 */
-                    }
-                    m = ((int16)left_line[row] + (int16)right_line[row]) / 2;
-                
-                    /* 种子只在双边都在时更新（防跑飞，这条要保留） */
-                    center = (uint8)m;
-                    if (center < SEARCH_RANGE)         center = SEARCH_RANGE;
-                    if (center > IMG_W - SEARCH_RANGE) center = IMG_W - SEARCH_RANGE;
-                }
+        {
+            int16 w = ((int16)right_line[row] - (int16)left_line[row]) / 2;
+
+            /* ★在线标定“这一行”的半宽 */
+            if (w > HALF_W_MIN && w < HALF_W_MAX)
+            {
+                if (half_w_mem[row] == 0) half_w_mem[row] = w;
+                else half_w_mem[row] = (half_w_mem[row] * 7 + w) / 8;
+                last_w = half_w_mem[row];
+                row_w  = row;
+            }
+            m = ((int16)left_line[row] + (int16)right_line[row]) / 2;
+        }
         else if (right_find_flag[row])          /* 左丢 → 靠右线 + 该行半宽 */
         {
             m = (int16)right_line[row] - hw;
@@ -117,16 +200,15 @@ void scan_lines(uint8 threshold, uint8 *left_line, uint8 *right_line, uint8 *mid
         }
         else                                    /* 都丢 → 继承更近的一行 */
         {
-            m = (row < START_ROW) ? mid_line[row + 1] : head_fallback;
+            m = (row < START_ROW) ? mid_line[row + 1] : mid_head_mem;
         }
-    
+
         if (m < 0)         m = 0;
         if (m > IMG_W - 1) m = IMG_W - 1;
-        if (row == START_ROW && (left_find_flag[row] || right_find_flag[row]))
-            mid_head_mem = (uint8)m;
-
         mid_line[row] = (uint8)m;
 
+        if (row == START_ROW && (left_find_flag[row] || right_find_flag[row]))
+            mid_head_mem = (uint8)m;
     }
 }
 
