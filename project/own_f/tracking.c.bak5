@@ -200,8 +200,6 @@ uint8 track_out_check(void)
     else
     {
         track_out_cnt = 0;                                  /* 只要有一帧不像，就重新计数 */
-        if (TRACK_OUT_LATCH == 0) track_out_flag = 0;       /* ★调试模式：条件消失就自动解除
-                                                                （原来这里没有复位 → 误判一次就永远停机） */
     }
 
     return track_out_flag;
@@ -270,7 +268,7 @@ static void cross_set_straight(uint8 *l_line, uint8 *r_line, uint8 *m_line)
  *------------------------------------------------------------------*/
 uint8 cross_fill_new(uint8 *l_line, uint8 *r_line, uint8 *m_line)
 {
-    int row, near_lost, near_both_lost, far_found;
+    int row, near_lost, near_both_lost;
     int ok, n, mm, mm0;
     float sx = 0, sy = 0, sxx = 0, sxy = 0, den, a = 0.0f, b = 0.0f;
 
@@ -332,24 +330,6 @@ uint8 cross_fill_new(uint8 *l_line, uint8 *r_line, uint8 *m_line)
         }
     }
     if (ok < CROSS_NEAR_OK || n < CROSS_FIT_MIN) return 0;   /* 数据不够 → 放行，绝不强制打正 */
-
-    /* ★近端必须够“干净”：[near_lost+1, 119] 里至少 3/4 的行两侧都有线。
-       防止“线是慢慢糊掉、慢慢丢的”那种渐变情况被当成十字 */
-    if (ok * 4 < (START_ROW - near_lost) * 3) return 0;
-
-    /* --- 2.5) ★★最关键的一条：断口必须是“内部开口” ---
-       也就是：近处有线 → 中间断开 → 【远处又看到线】。
-       这一条把“图像最上方看不清”这种正常情况彻底排除掉：
-           正常赛道：最上方看不清 → 丢失区一直延伸到图像顶部 → 断口上方永远找不到线（far_found < 0）
-           真十字  ：断口上方还能看到十字对面的赛道 → far_found >= 0
-       ★没有这一条时：直道上（图像上部丢线）也会被当成十字 → 强制直行 →
-         等车开到弯道就“不转弯、直接冲出赛道” */
-    far_found = -1;
-    for (row = near_lost - 1; row >= END_ROW; row--)
-        if (left_find_flag[row] && right_find_flag[row]) { far_found = row; break; }
-
-    if (far_found < 0) return 0;                            /* 断口上方看不到线 → 不是十字 */
-    if (near_lost - far_found < CROSS_GAP_MIN) return 0;    /* 断口太小 → 不是十字 */
 
     den = (float)n * sxx - sx * sx;
     if (den > 1.0f)
@@ -432,6 +412,12 @@ float compute_servo_angle(uint8 *mid_line, uint8 row, uint8 center_col,
 /* 巡线总流程：主循环在 image_update() 之后、image_frame_done() 之前调用 */
 void tracking_task(void)
 {
+    /* ★★出界保护放在最前面：一旦判出界，直接把电机置零，本帧不再巡线、不再打舵 ★★ */
+    if (track_out_check())
+    {
+        motor_enable_set(0);      /* 电机置零  */
+        return;
+    }
 
     scan_lines(image_get_threshold(), left_line, right_line, mid_line, START_ROW, END_ROW);
     cross_flag = cross_fill_new(left_line, right_line, mid_line);
@@ -442,11 +428,6 @@ void tracking_task(void)
     servo_set_angle( compute_servo_angle(mid_line, CONTROL_ROW, IMG_CENTER,
                                          servo_kp, servo_kd,
                                          SERVO_MID, SERVO_RIGHT_MAX, SERVO_LEFT_MEX) );
-
-    /* ★出界保护放在最后：只切电机，绝不跳过舵机更新。
-       原来它在最前面 + 直接 return → 出界后舵机再也不更新，车不能转弯、只能直线滑出赛道 */
-    if (track_out_check())          motor_enable_set(0);   /* 判出界 → 切电机 */
-    else if (TRACK_OUT_LATCH == 0)  motor_enable_set(1);   /* 调试模式：条件消失就自动恢复 */
 
     /* ★以后元素判断（环岛/斑马线/出界）就插在这一行前面，改完 mid_line 再算角度 */
 }
