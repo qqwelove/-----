@@ -1,1 +1,0 @@
-"..\user\isr.c" LARGE FLOAT64 ROM(HUGE) WARNINGLEVEL (3) OPTIMIZE (0,SIZE) BROWSE INCDIR(..\user;..\own_f;..\mdk;..\code;..\..\libraries\doc;..\..\libraries\zf_common;..\..\libraries\zf_components;..\..\libraries\zf_device;..\..\libraries\zf_driver) DEBUG PRINT(.\out_file\isr.lst) TABS (2) OBJECT(.\out_file\isr.obj)

@@ -1,0 +1,11 @@
+﻿# Keil 编译产物
+project/mdk/out_file/
+project/user/main.LST
+*.LST
+
+# 历史备份（git 本身就有历史，不需要这些）
+project/own_f/bak/
+*.bak
+
+# Keil IDE 窗口布局（与工程无关）
+*.uvgui.*
