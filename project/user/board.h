@@ -19,9 +19,9 @@
 #define CAMERA_DIS_H        ( MT9V03X_H * 1.2f)                               // 图像显示高度 默认 1:1 显示 放大可以改成 ( MT9V03X_H * 3 / 2 )
 
 /*舵机配置*/
-#define SERVO_MID          88.5f  //正中
+#define SERVO_MID          85.5f  //正中
 #define SERVO_RIGHT_MAX    76.0f //最右
-#define SERVO_LEFT_MEX     99.5f  //最左
+#define SERVO_LEFT_MEX     96.5f  //最左
 
 /*电机配置*/
 #define DIR_1               ( IO_P75 )//右电机

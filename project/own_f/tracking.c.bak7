@@ -371,58 +371,70 @@ static void filter_mid_line(void)
 }
 
 
+/* ★舵机误差用哪种算法（改这里就能 A/B 对比）：
+     0 = 中线偏差 mid_line[控制行] - 图像中心      ← 原来的，量纲是“像素”
+     1 = 差比和 calc_diff(左边线, 右边线)          ← 尺度无关，量纲是 ±128
+   ★改成 1 之后 servo_kp / servo_kd 必须重新整定（大概要减到原来的 2/3 左右），
+     因为它把“远处的窄赛道”也放大了误差，同样的 kp 会打得更狠。 */
+#define SERVO_ERR_MODE   1
+
 /*-------------------------------------------------------------------
  * 差比和：(x-y)/(x+y) * 128
- *   ★“尺度无关”：赛道在图像里变宽/变窄（远近、相机高度、俯仰变化）时，
- *     同样的物理偏移算出来是同一个数 —— 换相机高度不用重调 kp。
- *   ★量纲：err / 128 = 偏移量 / 半赛道宽；满量程 ±128（车压到边线就是 128）。
- *   ★全程 int32 运算，防止 (x-y)<<7 在 int16 下溢出。
+ *   ★它是“尺度无关”的：赛道在图像里变窄（远处 / 弯道中）时，
+ *     同样的像素偏移会算出更大的误差 —— 这正是弯道需要的打角补偿；
+ *     而 (mid-94) 是绝对像素差，赛道看起来变窄时误差偏小、打角不够。
+ *   ★全程用 int32 运算，防止 (x-y)<<7 在 int16 下溢出。
  *------------------------------------------------------------------*/
-static int16 calc_diff(int16 x, int16 y)
+int16 calc_diff(int16 x, int16 y)
 {
     int32 s = (int32)x + (int32)y;
     if (s == 0) return 0;
     return (int16)((((int32)x - (int32)y) << 7) / s);
 }
 
-/*-------------------------------------------------------------------
- * 舵机打角：误差 = 差比和（偏移量占半赛道宽的比例 × 128）
- *   居中 → 0；赛道中心偏右 → 正 → 舵机往右打；偏左 → 负。
- *------------------------------------------------------------------*/
 float compute_servo_angle(uint8 *mid_line, uint8 row, uint8 center_col,
                           float kp, float kd, float mid_angle, float min_angle, float max_angle)
 {
-    #define DEAD_ZONE   3               /* 差比和量纲（±128）下的死区，防直道抖舵 */
+#if SERVO_ERR_MODE
+    #define DEAD_ZONE   3               /* 差比和量纲（±128）下的死区 */
+#else
+    #define DEAD_ZONE   2               /* 像素量纲下的死区，防直道抖舵 */
+#endif
     static int16 last_err = 0;
     int16 err;
     float d_err, offset, target;
 
+#if SERVO_ERR_MODE
     if (left_find_flag[row] && right_find_flag[row])
     {
-        /* 控制行两侧边线都在 → 差比和。
-           ★必须传“两条边线到图像中心的距离”，不能传原始列号：
-             用列号算 (l-r)/(l+r) 在车居中时并不为 0，是个错的量 */
-        err = calc_diff((int16)right_line[row] - (int16)center_col,
-                        (int16)center_col - (int16)left_line[row]);
-        if (err >  128) err =  128;                 /* 满量程就是 ±128，超了夹住 */
+        /* 控制行两侧边线都在 → 用差比和（尺度无关） */
+        /* ★差比和的正确用法：要传“两条边线到图像中心的距离”，不是原始列号！
+             直接用列号算 (l-r)/(l+r) 在车居中时并不为 0（会得到 负半宽/中线列），是个错的量。
+             传“距离”之后：居中 → 0；赛道中心偏右 → 正；偏左 → 负（和你原来的 mid-中心 同号） */
+        err = calc_diff((int16)right_line[row] - (int16)IMG_CENTER,
+                        (int16)IMG_CENTER - (int16)left_line[row]);
+        if (err >  128) err =  128;                 /* 差比和满量程就是 ±128，超了夹住 */
         if (err < -128) err = -128;
     }
     else
     {
-        /* 单边丢线 → 用该行学到的半宽做同样的归一化：
-             偏移 / 半宽 * 128，和差比和是同一个数学形式，切换时不会突然打角 */
-        int16 hw = (half_w_mem[row] != 0) ? half_w_mem[row] : HALF_W_DEF;
-        if (hw < HALF_W_MIN) hw = HALF_W_MIN;
-        err = (int16)(((int32)mid_line[row] - (int32)center_col) * 128 / hw);
+        /* 单边丢线 → 用该行学到的半宽做同样的归一化，保证和差比和量纲连续、不会突然打角 */
+        {
+            int16 hw = (half_w_mem[row] != 0) ? half_w_mem[row] : HALF_W_DEF;
+            if (hw < HALF_W_MIN) hw = HALF_W_MIN;
+            err = (int16)(((int32)mid_line[row] - (int32)center_col) * 128 / hw);
+        }
     }
-
+#else
+    err = (int16)mid_line[row] - (int16)center_col;
+#endif
     if (err > -DEAD_ZONE && err < DEAD_ZONE) err = 0;
 
     d_err    = (float)(err - last_err);
     last_err = err;
 
     offset = kp * err + kd * d_err;
-    target = mid_angle - offset;        /* 偏右(err>0) → 角度变小 → 右转 */
+    target = mid_angle - offset;        /* 中线偏右(err>0) → 角度变小 → 右转 */
 
     if (target > max_angle) target = max_angle;
     if (target < min_angle) target = min_angle;

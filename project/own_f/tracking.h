@@ -46,6 +46,18 @@ void  track_out_reset(void);      /* 手动清除出界锁存 + 复位最小值（调试用） */
 extern int16 dbg_cross_a100;   /* 进入方向斜率 ×100 */
 extern uint8 dbg_cross_m0;   /* 入口处中线 */
 extern uint8 dbg_cross_m94;   /* 控制行(94)的中线 */
+/* ★dbg_cross_stage：十字补线卡在哪一步（image_show 打到屏上，过十字时盯着看）
+    0 = 本帧没走到补线（CROSS_FILL_ENABLE=0 / 帧没进来）
+    1 = (1) 找不到「两侧同时丢线」的行 ← 头号嫌疑：十字里边线被找到了，但找错了
+    2 = (2) 开口位置不合理（太远 / 太靠车头）
+    3 = (3) 近端有效行不足 / 拟合点不足
+    4 = (4) 入口处中线偏离中心 → 正在转向
+    5 = (5) 入口斜率过大 → 正在弯道
+    6 = (6) 已补线（插值），且补线区盖住控制行 → 舵机吃得到 [好]
+    7 = (7) 已补线（外推），且补线区盖住控制行 → 舵机吃得到 [好]
+    8 = (8) 已补线（插值），但补线区在控制行之外 → 舵机吃不到 [无效]
+    9 = (9) 已补线（外推），但补线区在控制行之外 → 舵机吃不到 [无效] */
+extern uint8 dbg_cross_stage;
 
 
 void  scan_lines(uint8 threshold, uint8 *left_line, uint8 *right_line, uint8 *mid_line,
